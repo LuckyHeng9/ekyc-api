@@ -4,6 +4,7 @@ import { getDatabase } from '../core/db';
 export interface EkycSessionRecord {
   requestId: string;
   idFrontKey?: string;
+  idBackKey?: string;
   selfieKey?: string;
   result?: {
     verified: boolean;

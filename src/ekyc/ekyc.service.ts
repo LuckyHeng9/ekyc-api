@@ -19,6 +19,83 @@ export class EkycService {
   private readonly faceMatch = new FaceMatchService();
   private readonly s3 = new S3Service();
 
+  // ── Direct file upload helpers ──────────────────────────────────────────
+
+  async uploadIdFrontFile(requestId: string, file: Express.Multer.File) {
+    const session = await this.store.get(requestId);
+    if (!session) {
+      throw new NotFoundException('E-KYC session not found');
+    }
+
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const key = `ekyc/${requestId}/id-front-${randomUUID()}-${file.originalname}`;
+    await this.s3.uploadImage(key, file.buffer, file.mimetype);
+
+    session.idFrontKey = key;
+    await this.store.set(session);
+
+    this.logger.log(`[${requestId}] ID front uploaded → ${key}`);
+
+    return {
+      requestId,
+      status: 'id-front-uploaded',
+      key,
+    };
+  }
+
+  async uploadIdBackFile(requestId: string, file: Express.Multer.File) {
+    const session = await this.store.get(requestId);
+    if (!session) {
+      throw new NotFoundException('E-KYC session not found');
+    }
+
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const key = `ekyc/${requestId}/id-back-${randomUUID()}-${file.originalname}`;
+    await this.s3.uploadImage(key, file.buffer, file.mimetype);
+
+    session.idBackKey = key;
+    await this.store.set(session);
+
+    this.logger.log(`[${requestId}] ID back uploaded → ${key}`);
+
+    return {
+      requestId,
+      status: 'id-back-uploaded',
+      key,
+    };
+  }
+
+  async uploadSelfieFile(requestId: string, file: Express.Multer.File) {
+    const session = await this.store.get(requestId);
+    if (!session) {
+      throw new NotFoundException('E-KYC session not found');
+    }
+
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const key = `ekyc/${requestId}/selfie-${randomUUID()}-${file.originalname}`;
+    await this.s3.uploadImage(key, file.buffer, file.mimetype);
+
+    session.selfieKey = key;
+    await this.store.set(session);
+
+    this.logger.log(`[${requestId}] Selfie uploaded → ${key}`);
+
+    return {
+      requestId,
+      status: 'selfie-uploaded',
+      key,
+    };
+  }
+
   getStatus() {
     return {
       service: 'ekyc',
