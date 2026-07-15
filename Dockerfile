@@ -47,6 +47,11 @@ RUN find node_modules \( \
       -name "__tests__" -o -name "docs" -o -name "doc" \
     \) -prune -exec rm -rf {} + 2>/dev/null; exit 0
 
+# ── Shim: face-api hardcodes require('tfjs-node'), redirect to pure-JS tfjs ──
+RUN mkdir -p node_modules/@tensorflow/tfjs-node && \
+    echo "module.exports = require('@tensorflow/tfjs');" > node_modules/@tensorflow/tfjs-node/index.js && \
+    echo '{"name":"@tensorflow/tfjs-node","version":"0.0.0","main":"index.js"}' > node_modules/@tensorflow/tfjs-node/package.json
+
 # ── Stage 2: Production runtime ─────────────────────────────
 FROM node:20-slim AS runner
 
