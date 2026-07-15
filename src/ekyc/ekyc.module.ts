@@ -10,4 +10,3 @@ import { FaceMatchService } from './face-match.service';
   providers: [EkycService, S3Service, OcrService, FaceMatchService],
 })
 export class EkycModule {}
-

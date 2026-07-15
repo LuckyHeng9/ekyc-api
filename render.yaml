@@ -1,0 +1,34 @@
+# ──────────────────────────────────────────────────────────────
+# render.yaml — Render Blueprint (Infrastructure as Code)
+#
+# Connect your GitHub repo to Render, and it will auto-detect
+# this file to configure your service.
+#
+# Docs: https://docs.render.com/blueprint-spec
+# ──────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: ekyc-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter       # starter ($7/mo) — or "free" for hobby
+    region: singapore   # closest to Cambodia/SEA
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "2000"
+      - key: NODE_ENV
+        value: production
+      - key: S3_ENDPOINT
+        sync: false       # "sync: false" = must set manually in Render dashboard
+      - key: S3_REGION
+        value: us-east-1
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: MONGO_URI
+        sync: false

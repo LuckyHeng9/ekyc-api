@@ -7,8 +7,8 @@ import { join } from 'node:path';
 
 export interface FaceMatchResult {
   matched: boolean;
-  distance: number;       // 0 = identical, 1 = totally different
-  confidence: number;     // 0–100%
+  distance: number; // 0 = identical, 1 = totally different
+  confidence: number; // 0–100%
   message: string;
 }
 
@@ -26,8 +26,10 @@ export class FaceMatchService {
     this.logger.log(`Loading face-api models from: ${modelPath}`);
 
     // Patch canvas into face-api (required for Node.js)
-    const { Canvas, Image, ImageData } = canvas;
-    faceapi.env.monkeyPatch({ Canvas: Canvas as any, Image: Image as any, ImageData: ImageData as any });
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+    const { Canvas, Image, ImageData } = canvas as any;
+    faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath);
     await faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath);
@@ -37,11 +39,20 @@ export class FaceMatchService {
     this.logger.log('Face-api models loaded ✅');
   }
 
-  async compareFaces(idImageBuffer: Buffer, selfieBuffer: Buffer): Promise<FaceMatchResult> {
+  async compareFaces(
+    idImageBuffer: Buffer,
+    selfieBuffer: Buffer,
+  ): Promise<FaceMatchResult> {
     await this.loadModels();
 
-    const idDescriptor = await this.getFaceDescriptor(idImageBuffer, 'ID image');
-    const selfieDescriptor = await this.getFaceDescriptor(selfieBuffer, 'selfie');
+    const idDescriptor = await this.getFaceDescriptor(
+      idImageBuffer,
+      'ID image',
+    );
+    const selfieDescriptor = await this.getFaceDescriptor(
+      selfieBuffer,
+      'selfie',
+    );
 
     if (!idDescriptor || !selfieDescriptor) {
       return {
@@ -58,7 +69,9 @@ export class FaceMatchService {
     const confidence = Math.max(0, Math.round((1 - distance) * 100));
     const matched = distance < MATCH_THRESHOLD;
 
-    this.logger.log(`Face match: distance=${distance.toFixed(3)}, confidence=${confidence}%, matched=${matched}`);
+    this.logger.log(
+      `Face match: distance=${distance.toFixed(3)}, confidence=${confidence}%, matched=${matched}`,
+    );
 
     return {
       matched,
@@ -70,10 +83,14 @@ export class FaceMatchService {
     };
   }
 
-  private async getFaceDescriptor(buffer: Buffer, label: string): Promise<Float32Array | undefined> {
+  private async getFaceDescriptor(
+    buffer: Buffer,
+    label: string,
+  ): Promise<Float32Array | undefined> {
     try {
       const img = await canvas.loadImage(buffer);
       const detection = await faceapi
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .detectSingleFace(img as any)
         .withFaceLandmarks()
         .withFaceDescriptor();

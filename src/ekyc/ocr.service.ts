@@ -58,7 +58,7 @@ export class OcrService {
   private extractIdNumber(text: string): string | undefined {
     const patterns = [
       /(?:ID|No|Number|Card No)[.:\s]+([A-Z0-9]{6,20})/i,
-      /\b([0-9]{9,12})\b/,  // 9-12 digit number (common for national IDs)
+      /\b([0-9]{9,12})\b/, // 9-12 digit number (common for national IDs)
       /\b([A-Z]{1,3}[0-9]{6,9})\b/, // Letter+digit format
     ];
 
@@ -69,10 +69,14 @@ export class OcrService {
     return undefined;
   }
 
-  private extractDate(text: string, type: 'dob' | 'expiry'): string | undefined {
-    const keywords = type === 'dob'
-      ? ['Date of Birth', 'DOB', 'Born', 'Birth']
-      : ['Expiry', 'Expiration', 'Valid Until', 'Expires'];
+  private extractDate(
+    text: string,
+    type: 'dob' | 'expiry',
+  ): string | undefined {
+    const keywords =
+      type === 'dob'
+        ? ['Date of Birth', 'DOB', 'Born', 'Birth']
+        : ['Expiry', 'Expiration', 'Valid Until', 'Expires'];
 
     // Try keyword-specific extraction first
     for (const keyword of keywords) {
@@ -85,7 +89,7 @@ export class OcrService {
     }
 
     // Fallback: extract all dates and pick first (dob) or last (expiry)
-    const datePattern = /\b(\d{1,2}[\s/\-]\d{1,2}[\s/\-]\d{2,4})\b/g;
+    const datePattern = /\b(\d{1,2}[\s/-]\d{1,2}[\s/-]\d{2,4})\b/g;
     const dates = [...text.matchAll(datePattern)].map((m) => m[1]);
 
     if (dates.length === 0) return undefined;

@@ -44,11 +44,13 @@ export class UserStore {
     return record ?? undefined;
   }
 
-  async create(data: Omit<UserRecord, '_id' | 'createdAt' | 'updatedAt'>): Promise<UserRecord> {
+  async create(
+    data: Omit<UserRecord, '_id' | 'createdAt' | 'updatedAt'>,
+  ): Promise<UserRecord> {
     const collection = await this.connect();
     const now = new Date();
     const record: UserRecord = { ...data, createdAt: now, updatedAt: now };
-    const result = await collection.insertOne(record as any);
+    const result = await collection.insertOne(record);
     return { ...record, _id: result.insertedId };
   }
 }

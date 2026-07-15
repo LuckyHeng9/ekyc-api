@@ -36,12 +36,16 @@ export class EkycStore {
   async get(requestId: string): Promise<EkycSessionRecord | undefined> {
     const collection = await this.connect();
     const record = await collection.findOne({ requestId });
-    return record ? (record as EkycSessionRecord) : undefined;
+    return record ? record : undefined;
   }
 
   async set(record: EkycSessionRecord) {
     const collection = await this.connect();
-    await collection.updateOne({ requestId: record.requestId }, { $set: record }, { upsert: true });
+    await collection.updateOne(
+      { requestId: record.requestId },
+      { $set: record },
+      { upsert: true },
+    );
     return record;
   }
 

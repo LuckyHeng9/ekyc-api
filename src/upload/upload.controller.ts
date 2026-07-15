@@ -1,5 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import { ApiBody, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { Auth } from '../common/decorators/auth.decorator';
 import { UploadService } from './upload.service';
 
@@ -23,7 +28,14 @@ export class UploadController {
     },
   })
   @ApiResponse({ status: 201, description: 'Presigned upload created' })
-  async createPresignedUpload(@Body() body: { fileName: string; contentType: string; contentLength?: number }) {
+  async createPresignedUpload(
+    @Body()
+    body: {
+      fileName: string;
+      contentType: string;
+      contentLength?: number;
+    },
+  ) {
     return this.uploadService.createPresignedUpload(body);
   }
 
@@ -44,5 +56,4 @@ export class UploadController {
   async createPresignedView(@Body() body: { key: string }) {
     return this.uploadService.createPresignedView(body);
   }
-
 }

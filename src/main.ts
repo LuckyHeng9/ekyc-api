@@ -1,22 +1,27 @@
+import 'dotenv/config';
 import { join } from 'node:path';
-import { config } from 'dotenv';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { connectToDatabase } from './core/db';
 
-config();
-
-async function listenWithFallback(app: any, port: number, attempt = 0) {
+async function listenWithFallback(
+  app: NestExpressApplication,
+  port: number,
+  attempt = 0,
+) {
   const candidatePort = port + attempt;
 
   try {
     await app.listen(candidatePort);
     console.log(`Application is running on: http://localhost:${candidatePort}`);
-  } catch (error: any) {
-    if (error?.code === 'EADDRINUSE' && attempt < 10) {
-      console.warn(`Port ${candidatePort} is busy, trying ${candidatePort + 1}...`);
+  } catch (error: unknown) {
+    const err = error as { code?: string };
+    if (err?.code === 'EADDRINUSE' && attempt < 10) {
+      console.warn(
+        `Port ${candidatePort} is busy, trying ${candidatePort + 1}...`,
+      );
       await listenWithFallback(app, port, attempt + 1);
       return;
     }
@@ -57,4 +62,4 @@ async function bootstrap() {
   await killProcessOnPort(port);
   await listenWithFallback(app, port);
 }
-bootstrap();
+void bootstrap();

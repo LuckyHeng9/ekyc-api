@@ -5,7 +5,11 @@ import { S3Service } from '../ekyc/s3.service';
 export class UploadService {
   constructor(private readonly s3Service: S3Service) {}
 
-  async createPresignedUpload(payload: { fileName: string; contentType: string; contentLength?: number }) {
+  async createPresignedUpload(payload: {
+    fileName: string;
+    contentType: string;
+    contentLength?: number;
+  }) {
     return this.s3Service.createPresignedUpload(payload);
   }
 

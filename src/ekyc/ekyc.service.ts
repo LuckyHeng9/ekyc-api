@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { VerifyIdentityDto } from './dto/verify-identity.dto';
 import { EkycStore, EkycSessionRecord } from './ekyc.store';
@@ -89,12 +94,19 @@ export class EkycService {
     // ── Step 2: Run OCR on ID image ──────────────────────────────────────────
     this.logger.log(`[${payload.requestId}] Running OCR...`);
     const ocrResult = await this.ocr.extractFromImage(idBuffer);
-    this.logger.log(`[${payload.requestId}] OCR done — confidence: ${ocrResult.confidence.toFixed(1)}%`);
+    this.logger.log(
+      `[${payload.requestId}] OCR done — confidence: ${ocrResult.confidence.toFixed(1)}%`,
+    );
 
     // ── Step 3: Face match selfie vs ID photo ────────────────────────────────
     this.logger.log(`[${payload.requestId}] Running face match...`);
-    const faceResult = await this.faceMatch.compareFaces(idBuffer, selfieBuffer);
-    this.logger.log(`[${payload.requestId}] Face match done — ${faceResult.message}`);
+    const faceResult = await this.faceMatch.compareFaces(
+      idBuffer,
+      selfieBuffer,
+    );
+    this.logger.log(
+      `[${payload.requestId}] Face match done — ${faceResult.message}`,
+    );
 
     // ── Step 4: Determine overall verification result ────────────────────────
     const verified = faceResult.matched && ocrResult.confidence > 30;
@@ -119,7 +131,9 @@ export class EkycService {
     session.result = result;
     await this.store.set(session);
 
-    this.logger.log(`[${payload.requestId}] Verification complete — verified: ${verified}`);
+    this.logger.log(
+      `[${payload.requestId}] Verification complete — verified: ${verified}`,
+    );
 
     return {
       requestId: payload.requestId,

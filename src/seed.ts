@@ -1,7 +1,6 @@
-import { config } from 'dotenv';
+import 'dotenv/config';
+import { Db } from 'mongodb';
 import { connectToDatabase } from './core/db';
-
-config();
 
 interface EkycSessionRecord {
   requestId: string;
@@ -102,7 +101,7 @@ const userSeedData: UserRecord[] = [
 ];
 
 // ── seeders ──────────────────────────────────────────────────────────────────
-async function seedEkycSessions(db: any) {
+async function seedEkycSessions(db: Db) {
   const collectionName = process.env.MONGO_COLLECTION ?? 'ekyc_sessions';
   const collection = db.collection(collectionName);
   await collection.createIndex({ requestId: 1 }, { unique: true });
@@ -117,7 +116,7 @@ async function seedEkycSessions(db: any) {
       skipped++;
       continue;
     }
-    await collection.insertOne(record as any);
+    await collection.insertOne(record);
     console.log(`✅ [ekyc_sessions] Inserted: ${record.requestId}`);
     inserted++;
   }
@@ -125,7 +124,7 @@ async function seedEkycSessions(db: any) {
   console.log(`   → ekyc_sessions: inserted=${inserted}, skipped=${skipped}`);
 }
 
-async function seedUsers(db: any) {
+async function seedUsers(db: Db) {
   const collection = db.collection('users');
   await collection.createIndex({ email: 1 }, { unique: true });
 
@@ -139,7 +138,7 @@ async function seedUsers(db: any) {
       skipped++;
       continue;
     }
-    await collection.insertOne(record as any);
+    await collection.insertOne(record);
     console.log(`✅ [users] Inserted: ${record.email}`);
     inserted++;
   }
