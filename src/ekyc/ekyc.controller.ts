@@ -4,13 +4,9 @@ import {
   Get,
   Param,
   Post,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
-  ApiConsumes,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
@@ -40,81 +36,6 @@ export class EkycController {
 
   @Post('upload-id-front')
   @Auth()
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({
-    summary: 'Upload the ID front image for an E-KYC session (file upload)',
-  })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        requestId: { type: 'string' },
-        file: { type: 'string', format: 'binary' },
-      },
-      required: ['requestId', 'file'],
-    },
-  })
-  @ApiResponse({ status: 201, description: 'ID front image uploaded to S3' })
-  uploadIdFrontFile(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() body: { requestId: string },
-  ) {
-    return this.ekycService.uploadIdFrontFile(body.requestId, file);
-  }
-
-  @Post('upload-id-back')
-  @Auth()
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({
-    summary: 'Upload the ID back image for an E-KYC session (file upload)',
-  })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        requestId: { type: 'string' },
-        file: { type: 'string', format: 'binary' },
-      },
-      required: ['requestId', 'file'],
-    },
-  })
-  @ApiResponse({ status: 201, description: 'ID back image uploaded to S3' })
-  uploadIdBackFile(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() body: { requestId: string },
-  ) {
-    return this.ekycService.uploadIdBackFile(body.requestId, file);
-  }
-
-  @Post('upload-selfie')
-  @Auth()
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({
-    summary: 'Upload the selfie image for an E-KYC session (file upload)',
-  })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        requestId: { type: 'string' },
-        file: { type: 'string', format: 'binary' },
-      },
-      required: ['requestId', 'file'],
-    },
-  })
-  @ApiResponse({ status: 201, description: 'Selfie image uploaded to S3' })
-  uploadSelfieFile(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() body: { requestId: string },
-  ) {
-    return this.ekycService.uploadSelfieFile(body.requestId, file);
-  }
-
-  @Post('upload-id-front-key')
-  @Auth()
   @ApiOperation({
     summary: 'Store an existing S3 key as the ID front image',
   })
@@ -133,7 +54,27 @@ export class EkycController {
     return this.ekycService.uploadIdFront(payload);
   }
 
-  @Post('upload-selfie-key')
+  @Post('upload-id-back')
+  @Auth()
+  @ApiOperation({
+    summary: 'Store an existing S3 key as the ID back image',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        requestId: { type: 'string' },
+        key: { type: 'string' },
+      },
+      required: ['requestId', 'key'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'ID back image key stored' })
+  uploadIdBack(@Body() payload: { requestId: string; key: string }) {
+    return this.ekycService.uploadIdBack(payload);
+  }
+
+  @Post('upload-selfie')
   @Auth()
   @ApiOperation({
     summary: 'Store an existing S3 key as the selfie image',
