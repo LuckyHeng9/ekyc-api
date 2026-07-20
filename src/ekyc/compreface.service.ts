@@ -3,114 +3,151 @@ import FormData from 'form-data';
 
 export interface FaceMatchResult {
   matched: boolean;
-  similarity: number; // 0–1 (1 = identical)
+  similarity: number; // 0–1
   confidence: number; // 0–100%
   message: string;
 }
 
+/**
+ * Face verification using Luxand.cloud Face API
+ *
+ * Free tier: 500 API calls/month (no credit card required)
+ *
+ * Setup:
+ * 1. Sign up at dashboard.luxand.cloud
+ * 2. Copy your API token (top right of dashboard)
+ * 3. Add to .env:
+ *    LUXAND_TOKEN=your_token_here
+ *    COMPREFACE_THRESHOLD=0.8
+ *
+ * API docs: https://luxand.cloud/help
+ */
 @Injectable()
 export class CompreFaceService {
   private readonly logger = new Logger(CompreFaceService.name);
 
-  /** Base URL of the running CompreFace instance, e.g. http://compreface-ui:8000 */
-  private get baseUrl(): string {
-    return (process.env.COMPREFACE_URL ?? 'http://localhost:8000').replace(
-      /\/$/,
-      '',
-    );
+  private get token(): string {
+    return process.env.LUXAND_TOKEN ?? '';
   }
 
-  /** API key of the Face Verification service created in CompreFace UI */
-  private get apiKey(): string {
-    return process.env.COMPREFACE_API_KEY ?? '';
+  private get threshold(): number {
+    return parseFloat(process.env.COMPREFACE_THRESHOLD ?? '0.8');
   }
 
   /**
-   * Compare two face images using CompreFace Face Verification API.
+   * Compare two face images using Luxand Face Verification.
    *
-   * @param sourceBuffer  - selfie image (the "live" face)
-   * @param targetBuffer  - ID-card front image (the reference face)
+   * @param sourceBuffer - selfie (live face)
+   * @param targetBuffer - ID card front (reference face)
    */
   async compareFaces(
     sourceBuffer: Buffer,
     targetBuffer: Buffer,
   ): Promise<FaceMatchResult> {
-    const url = `${this.baseUrl}/api/v1/verification/verify`;
-
-    const form = new FormData();
-    form.append('source_image', sourceBuffer, {
-      filename: 'selfie.jpg',
-      contentType: 'image/jpeg',
-    });
-    form.append('target_image', targetBuffer, {
-      filename: 'id_front.jpg',
-      contentType: 'image/jpeg',
-    });
-
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'x-api-key': this.apiKey,
-          ...form.getHeaders(),
-        },
-        // form-data is a node Readable stream — cast for TypeScript
-        body: form as unknown as BodyInit,
-      });
-    } catch (err) {
-      this.logger.error(`CompreFace request failed: ${err}`);
+    if (!this.token) {
+      this.logger.warn('Luxand token not set — check LUXAND_TOKEN in .env');
       return {
         matched: false,
         similarity: 0,
         confidence: 0,
-        message: 'CompreFace service unreachable',
+        message: 'Face API not configured (set LUXAND_TOKEN)',
       };
     }
 
+    try {
+      // Step 1: Detect + store face from ID card → get uuid
+      const idUuid = await this.storeFace(targetBuffer, 'ID card');
+      if (!idUuid) {
+        return { matched: false, similarity: 0, confidence: 0, message: 'No face detected in ID card' };
+      }
+
+      // Step 2: Verify selfie against stored ID face
+      const result = await this.verifyFace(sourceBuffer, idUuid);
+
+      // Step 3: Delete the stored face (cleanup — don't persist biometric data)
+      await this.deleteFace(idUuid);
+
+      return result;
+    } catch (err) {
+      this.logger.error(`Luxand API error: ${err}`);
+      return { matched: false, similarity: 0, confidence: 0, message: 'Face comparison failed' };
+    }
+  }
+
+  /**
+   * Upload a face photo to Luxand temporary subject store.
+   * Returns the Luxand uuid for the stored face.
+   */
+  private async storeFace(buffer: Buffer, label: string): Promise<string | null> {
+    const form = new FormData();
+    form.append('photo', buffer, { filename: 'face.jpg', contentType: 'image/jpeg' });
+    form.append('name', `ekyc_${Date.now()}`);
+
+    const res = await fetch('https://us-api.luxand.cloud/subject', {
+      method: 'POST',
+      headers: {
+        token: this.token,
+        ...form.getHeaders(),
+      },
+      body: form as unknown as BodyInit,
+    });
+
     if (!res.ok) {
-      const body = await res.text();
-      this.logger.error(`CompreFace HTTP ${res.status}: ${body}`);
-      return {
-        matched: false,
-        similarity: 0,
-        confidence: 0,
-        message: `CompreFace error: ${res.status}`,
-      };
+      const err = await res.text();
+      this.logger.error(`Luxand store face failed for ${label} (${res.status}): ${err}`);
+      return null;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const json: any = await res.json();
+    const uuid: string | undefined = json?.uuid;
 
-    /*
-     * CompreFace response shape:
-     * {
-     *   "result": [{
-     *     "source_image_face": { ... },
-     *     "face_matches": [{ "similarity": 0.97, "face": { ... } }]
-     *   }]
-     * }
-     */
-    const matches: { similarity: number }[] | undefined =
-      json?.result?.[0]?.face_matches;
-
-    if (!matches || matches.length === 0) {
-      this.logger.warn('CompreFace: no face match result returned');
-      return {
-        matched: false,
-        similarity: 0,
-        confidence: 0,
-        message: 'No face detected in one or both images',
-      };
+    if (!uuid) {
+      this.logger.warn(`No face detected in ${label} by Luxand`);
+      return null;
     }
 
-    const similarity = matches[0].similarity ?? 0;
-    const threshold = parseFloat(process.env.COMPREFACE_THRESHOLD ?? '0.85');
-    const matched = similarity >= threshold;
+    this.logger.log(`Luxand: stored ${label} face → uuid=${uuid}`);
+    return uuid;
+  }
+
+  /**
+   * Verify a selfie against a stored Luxand subject uuid.
+   */
+  private async verifyFace(selfieBuffer: Buffer, uuid: string): Promise<FaceMatchResult> {
+    const form = new FormData();
+    form.append('photo', selfieBuffer, { filename: 'selfie.jpg', contentType: 'image/jpeg' });
+
+    const res = await fetch(`https://us-api.luxand.cloud/photo/search`, {
+      method: 'POST',
+      headers: {
+        token: this.token,
+        ...form.getHeaders(),
+      },
+      body: form as unknown as BodyInit,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      this.logger.error(`Luxand verify failed (${res.status}): ${err}`);
+      return { matched: false, similarity: 0, confidence: 0, message: `Luxand error: ${res.status}` };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results: any[] = await res.json();
+    if (!results || results.length === 0) {
+      return { matched: false, similarity: 0, confidence: 0, message: 'No face detected in selfie' };
+    }
+
+    // Find match for our stored uuid
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const match = results[0]?.matches?.find((m: any) => m.uuid === uuid);
+    const similarity: number = match?.similarity ?? results[0]?.matches?.[0]?.similarity ?? 0;
+    const matched = similarity >= this.threshold;
     const confidence = Math.round(similarity * 100);
 
     this.logger.log(
-      `CompreFace: similarity=${similarity.toFixed(4)}, threshold=${threshold}, matched=${matched}`,
+      `Luxand: similarity=${similarity.toFixed(4)}, threshold=${this.threshold}, matched=${matched}`,
     );
 
     return {
@@ -118,8 +155,21 @@ export class CompreFaceService {
       similarity: parseFloat(similarity.toFixed(4)),
       confidence,
       message: matched
-        ? `Face match successful (${confidence}% similarity)`
-        : `Face mismatch — similarity ${confidence}% below threshold ${Math.round(threshold * 100)}%`,
+        ? `Face match successful (${confidence}% confidence)`
+        : `Face mismatch — confidence ${confidence}% below threshold ${Math.round(this.threshold * 100)}%`,
     };
+  }
+
+  /** Delete stored face from Luxand (GDPR / privacy cleanup) */
+  private async deleteFace(uuid: string): Promise<void> {
+    try {
+      await fetch(`https://us-api.luxand.cloud/subject/${uuid}`, {
+        method: 'DELETE',
+        headers: { token: this.token },
+      });
+      this.logger.log(`Luxand: deleted stored face uuid=${uuid}`);
+    } catch {
+      this.logger.warn(`Luxand: failed to delete face uuid=${uuid}`);
+    }
   }
 }
