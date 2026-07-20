@@ -1,0 +1,58 @@
+# CompreFace standalone deployment
+# Deploy this on Railway: railway.app → New Project → Deploy from GitHub
+# Or on any VPS: docker-compose -f compreface-only.yml up -d
+
+services:
+  compreface-postgres-db:
+    image: exadel/compreface-postgres-db:1.2.0
+    restart: always
+    environment:
+      - POSTGRES_USER=compreface
+      - POSTGRES_PASSWORD=compreface
+      - POSTGRES_DB=frs
+    volumes:
+      - compreface-postgres:/var/lib/postgresql/data
+
+  compreface-core:
+    image: exadel/compreface-core:1.2.0
+    restart: always
+    environment:
+      - ML_PORT=3000
+
+  compreface-api:
+    image: exadel/compreface-api:1.2.0
+    restart: always
+    environment:
+      - POSTGRES_USER=compreface
+      - POSTGRES_PASSWORD=compreface
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - SAVE_IMAGES_TO_DB=true
+    depends_on:
+      - compreface-postgres-db
+      - compreface-core
+
+  compreface-admin:
+    image: exadel/compreface-admin:1.2.0
+    restart: always
+    environment:
+      - POSTGRES_USER=compreface
+      - POSTGRES_PASSWORD=compreface
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - ENABLE_EMAIL_SERVER=false
+    depends_on:
+      - compreface-postgres-db
+      - compreface-api
+
+  compreface-fe:
+    image: exadel/compreface-fe:1.2.0
+    restart: always
+    ports:
+      - '8100:80'
+    depends_on:
+      - compreface-api
+      - compreface-admin
+
+volumes:
+  compreface-postgres:

@@ -13,10 +13,13 @@ import {
 import { Auth } from '../common/decorators/auth.decorator';
 import { EkycService } from './ekyc.service';
 import { VerifyIdentityDto } from './dto/verify-identity.dto';
+import { LivenessAction } from './liveness.service';
 
 @Controller('ekyc')
 export class EkycController {
   constructor(private readonly ekycService: EkycService) {}
+
+  // ─── Status ──────────────────────────────────────────────────────────────
 
   @Get('status')
   @Auth()
@@ -26,6 +29,8 @@ export class EkycController {
     return this.ekycService.getStatus();
   }
 
+  // ─── Session ─────────────────────────────────────────────────────────────
+
   @Post('start')
   @Auth()
   @ApiOperation({ summary: 'Start a new E-KYC workflow' })
@@ -34,11 +39,11 @@ export class EkycController {
     return this.ekycService.startEkyc();
   }
 
+  // ─── Image uploads ────────────────────────────────────────────────────────
+
   @Post('upload-id-front')
   @Auth()
-  @ApiOperation({
-    summary: 'Store an existing S3 key as the ID front image',
-  })
+  @ApiOperation({ summary: 'Store an existing S3 key as the ID front image' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -56,9 +61,7 @@ export class EkycController {
 
   @Post('upload-id-back')
   @Auth()
-  @ApiOperation({
-    summary: 'Store an existing S3 key as the ID back image',
-  })
+  @ApiOperation({ summary: 'Store an existing S3 key as the ID back image' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -76,9 +79,7 @@ export class EkycController {
 
   @Post('upload-selfie')
   @Auth()
-  @ApiOperation({
-    summary: 'Store an existing S3 key as the selfie image',
-  })
+  @ApiOperation({ summary: 'Store an existing S3 key as the selfie image' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -94,15 +95,91 @@ export class EkycController {
     return this.ekycService.uploadSelfie(payload);
   }
 
-  @Post('verify')
+  // ─── Liveness ────────────────────────────────────────────────────────────
+
+  @Post('liveness/request')
   @Auth()
-  @ApiOperation({ summary: 'Verify identity information' })
+  @ApiOperation({
+    summary: 'Request a random liveness challenge',
+    description:
+      'Returns a random action (blink / smile / turn_left / turn_right / nod) ' +
+      'that the user must perform. The client captures the action and then calls ' +
+      '`POST /ekyc/liveness/confirm` with the `challengeId` and performed `action`.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { requestId: { type: 'string' } },
+      required: ['requestId'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Liveness challenge issued',
+    schema: {
+      example: {
+        requestId: 'uuid',
+        challengeId: 'uuid',
+        action: 'blink',
+        instruction: 'Please blink both eyes',
+        expiresIn: 60,
+      },
+    },
+  })
+  requestLiveness(@Body() payload: { requestId: string }) {
+    return this.ekycService.requestLiveness(payload.requestId);
+  }
+
+  @Post('liveness/confirm')
+  @Auth()
+  @ApiOperation({
+    summary: 'Confirm a liveness challenge',
+    description:
+      'Client echoes back the `challengeId` and the `action` it performed. ' +
+      'In production this endpoint would also accept a video/frame buffer for ' +
+      'server-side anti-spoofing analysis.',
+  })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         requestId: { type: 'string' },
+        challengeId: { type: 'string' },
+        action: {
+          type: 'string',
+          enum: ['blink', 'smile', 'turn_left', 'turn_right', 'nod'],
+        },
       },
+      required: ['requestId', 'challengeId', 'action'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Liveness check passed' })
+  @ApiResponse({ status: 400, description: 'Wrong action or challenge expired' })
+  confirmLiveness(
+    @Body()
+    payload: {
+      requestId: string;
+      challengeId: string;
+      action: LivenessAction;
+    },
+  ) {
+    return this.ekycService.confirmLiveness(payload);
+  }
+
+  // ─── Verify ──────────────────────────────────────────────────────────────
+
+  @Post('verify')
+  @Auth()
+  @ApiOperation({
+    summary: 'Verify identity — runs OCR + CompreFace face match',
+    description:
+      'Requires ID front, selfie, and a **passed liveness challenge** before calling. ' +
+      'Uses CompreFace (self-hosted) for face comparison.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { requestId: { type: 'string' } },
       required: ['requestId'],
     },
   })
@@ -110,6 +187,8 @@ export class EkycController {
   verifyIdentity(@Body() payload: VerifyIdentityDto) {
     return this.ekycService.verifyIdentity(payload);
   }
+
+  // ─── Result ──────────────────────────────────────────────────────────────
 
   @Get('result/:requestId')
   @Auth()

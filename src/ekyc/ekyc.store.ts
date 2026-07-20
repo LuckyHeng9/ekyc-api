@@ -6,6 +6,14 @@ export interface EkycSessionRecord {
   idFrontKey?: string;
   idBackKey?: string;
   selfieKey?: string;
+  /** Liveness challenge issued for this session */
+  livenessChallenge?: {
+    challengeId: string;
+    action: string;
+    issuedAt: number;
+  };
+  /** Whether the liveness check has been passed */
+  livenessPassed?: boolean;
   result?: {
     verified: boolean;
     message: string;
@@ -15,7 +23,8 @@ export interface EkycSessionRecord {
     extractedExpiry?: string;
     ocrConfidence?: number;
     faceMatchConfidence?: number;
-    faceMatchDistance?: number;
+    faceMatchSimilarity?: number;
+    livenessPassed?: boolean;
   };
 }
 

@@ -9,42 +9,94 @@ services:
       - .env
     environment:
       - PORT=2000
-      - S3_ENDPOINT=http://minio:9000
-      - S3_REGION=${AWS_REGION}
-      - S3_BUCKET=${AWS_S3_BUCKET}
-      - S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - MONGO_URI=mongodb://mongo:27017
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - MONGO_URI=${MONGO_URI}
       - MONGO_DB=ekyc-api
       - MONGO_COLLECTION=ekyc_sessions
+      # CompreFace sidecar — internal Docker network URL
+      - COMPREFACE_URL=http://compreface-fe:80
+      - COMPREFACE_API_KEY=${COMPREFACE_API_KEY}
+      - COMPREFACE_THRESHOLD=${COMPREFACE_THRESHOLD:-0.85}
     depends_on:
-      - minio
-      - mongo
+      - compreface-fe
     restart: unless-stopped
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    ports:
-      - '19000:9000'
-      - '19001:9001'
-    env_file:
-      - .env
+  # ─────────────────────────────────────────────────────────────────────────
+  # CompreFace 1.2.0
+  #
+  # After first boot:
+  #   1. Open http://localhost:8100
+  #   2. Register → create an Application → add a "Face Verification" service
+  #   3. Click the service → copy the API Key
+  #   4. Paste it in .env → COMPREFACE_API_KEY=<key>
+  # ─────────────────────────────────────────────────────────────────────────
+
+  compreface-postgres-db:
+    image: exadel/compreface-postgres-db:1.2.0
+    restart: unless-stopped
     environment:
-      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
-      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+      - POSTGRES_USER=compreface
+      - POSTGRES_PASSWORD=compreface
+      - POSTGRES_DB=frs
     volumes:
-      - minio-data:/data
-    restart: unless-stopped
+      - compreface-postgres:/var/lib/postgresql/data
 
-  mongo:
-    image: mongo:7
-    ports:
-      - '27017:27017'
-    volumes:
-      - mongo-data:/data/db
+  compreface-core:
+    image: exadel/compreface-core:1.2.0
     restart: unless-stopped
+    environment:
+      - ML_PORT=3000
+      - IMG_LENGTH_LIMIT=640
+      - UWSGI_PROCESSES=2
+      - UWSGI_THREADS=1
+
+  compreface-api:
+    image: exadel/compreface-api:1.2.0
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=compreface
+      - POSTGRES_PASSWORD=compreface
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - SAVE_IMAGES_TO_DB=true
+      - MAX_FILE_SIZE=5MB
+      - MAX_REQUEST_SIZE=10MB
+    depends_on:
+      - compreface-postgres-db
+      - compreface-core
+
+  compreface-admin:
+    image: exadel/compreface-admin:1.2.0
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=compreface
+      - POSTGRES_PASSWORD=compreface
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - ENABLE_EMAIL_SERVER=false
+      - MAX_FILE_SIZE=5MB
+      - MAX_REQUEST_SIZE=10MB
+    depends_on:
+      - compreface-postgres-db
+      - compreface-api
+
+  # "compreface-fe" is the correct image name (not compreface-ui)
+  compreface-fe:
+    image: exadel/compreface-fe:1.2.0
+    restart: unless-stopped
+    ports:
+      - '8100:80'          # Admin UI → http://localhost:8100
+    environment:
+      - CLIENT_MAX_BODY_SIZE=10M
+      - PROXY_READ_TIMEOUT=60000ms
+      - PROXY_CONNECT_TIMEOUT=10000ms
+    depends_on:
+      - compreface-api
+      - compreface-admin
 
 volumes:
-  minio-data:
-  mongo-data:
+  compreface-postgres:

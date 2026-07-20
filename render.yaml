@@ -32,3 +32,9 @@ services:
         sync: false
       - key: MONGO_URI
         sync: false
+      - key: COMPREFACE_URL
+        sync: false       # public URL of your VPS CompreFace, e.g. http://1.2.3.4:8100
+      - key: COMPREFACE_API_KEY
+        sync: false
+      - key: COMPREFACE_THRESHOLD
+        value: "0.85"
