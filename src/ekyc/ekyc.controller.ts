@@ -4,12 +4,17 @@ import {
   Get,
   Param,
   Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Auth } from '../common/decorators/auth.decorator';
 import { EkycService } from './ekyc.service';
 import { VerifyIdentityDto } from './dto/verify-identity.dto';
@@ -93,6 +98,33 @@ export class EkycController {
   @ApiResponse({ status: 201, description: 'Selfie image key stored' })
   uploadSelfie(@Body() payload: { requestId: string; key: string }) {
     return this.ekycService.uploadSelfie(payload);
+  }
+
+  /**
+   * Browser-friendly upload: sends file directly to NestJS which uploads to S3.
+   * Avoids Supabase S3 CORS 403 on browser PUT.
+   * FormData fields: file (binary), requestId (string), type (id-front|id-back|selfie)
+   */
+  @Post('upload-file')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload file via NestJS → S3 (browser-safe, no CORS)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        requestId: { type: 'string' },
+        type: { type: 'string', enum: ['id-front', 'id-back', 'selfie'] },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Returns { key, status, requestId }' })
+  uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { requestId: string; type: 'id-front' | 'id-back' | 'selfie' },
+  ) {
+    return this.ekycService.uploadFile({ requestId: body.requestId, file, type: body.type });
   }
 
   // ─── Liveness ────────────────────────────────────────────────────────────

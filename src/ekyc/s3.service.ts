@@ -42,29 +42,19 @@ export class S3Service {
   }
 
   private async ensureBucketExists() {
-    if (!this.client) {
-      return;
-    }
-
+    if (!this.client) return;
     try {
       await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
     } catch (error: unknown) {
-      const err = error as {
-        name?: string;
-        $metadata?: { httpStatusCode?: number };
-      };
-      const alreadyExists =
-        err?.name === 'BucketAlreadyOwnedByYou' ||
-        err?.$metadata?.httpStatusCode === 409;
-      if (!alreadyExists) {
-        throw error;
-      }
+      const err = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      const httpStatus = err?.$metadata?.httpStatusCode ?? 0;
+      // Treat 409 (already exists), 403 (no permission = already exists in Supabase) as OK
+      const ignore = err?.name === 'BucketAlreadyOwnedByYou' || httpStatus === 409 || httpStatus === 403;
+      if (!ignore) throw error;
     }
   }
 
   async uploadImage(key: string, buffer: Buffer, contentType: string) {
-    await this.ensureBucketExists();
-
     if (this.client) {
       const command = new PutObjectCommand({
         Bucket: this.bucket,
@@ -72,7 +62,6 @@ export class S3Service {
         Body: buffer,
         ContentType: contentType,
       });
-
       await this.client.send(command);
     }
 
@@ -115,6 +104,13 @@ export class S3Service {
   }
 
   async downloadImage(key: string): Promise<Buffer> {
+    // Handle locally-stored files (uploaded via browser → NestJS)
+    if (key.startsWith('local:')) {
+      const filepath = key.slice('local:'.length);
+      const { readFile } = await import('node:fs/promises');
+      return readFile(filepath);
+    }
+
     if (!this.client) {
       throw new BadRequestException('S3 is not configured.');
     }

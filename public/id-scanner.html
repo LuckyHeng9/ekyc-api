@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ID Card Scanner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  :root{--bg:#0b0d14;--card:#13171f;--border:#1e2535;--accent:#6366f1;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--text:#f1f5f9;--muted:#64748b;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 16px;}
+  h1{font-size:1.6rem;font-weight:700;background:linear-gradient(135deg,#6366f1,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:32px;}
+  .scanner-box{width:100%;max-width:680px;}
+  .upload-zone{border:2px dashed var(--border);border-radius:20px;padding:40px 20px;text-align:center;cursor:pointer;transition:.3s;position:relative;background:var(--card);}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:#13131f;}
+  .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .upload-icon{font-size:3rem;margin-bottom:12px;}
+  .upload-label{font-size:.95rem;color:var(--muted);}
+  .upload-label b{color:var(--text);}
+  .preview-wrap{position:relative;margin-top:20px;border-radius:16px;overflow:hidden;display:none;}
+  .preview-wrap img{width:100%;max-height:300px;object-fit:contain;background:#0a0c12;display:block;}
+  .preview-badge{position:absolute;top:10px;right:10px;background:#00000088;backdrop-filter:blur(8px);border-radius:8px;padding:4px 10px;font-size:.75rem;color:#fff;}
+  .btn{width:100%;background:linear-gradient(135deg,var(--accent),#06b6d4);color:#fff;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:16px;transition:.3s;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn:hover{opacity:.9;transform:translateY(-1px);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  .spinner{width:18px;height:18px;border:2px solid #ffffff44;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .result{margin-top:24px;background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;display:none;}
+  .result-header{padding:16px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
+  .result-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+  .result-icon.ok{background:#10b98122;}
+  .result-icon.fail{background:#ef444422;}
+  .result-title{font-weight:700;font-size:1rem;}
+  .result-sub{font-size:.78rem;color:var(--muted);}
+  .fields{padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .field{background:#0a0c12;border-radius:10px;padding:12px 14px;}
+  .field-label{font-size:.7rem;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;}
+  .field-value{font-size:.9rem;font-weight:600;word-break:break-all;}
+  .field.full{grid-column:1/-1;}
+  .conf-wrap{padding:0 20px 16px;}
+  .conf-label{font-size:.75rem;color:var(--muted);margin-bottom:6px;}
+  .conf-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;}
+  .conf-fill{height:100%;border-radius:4px;transition:width .8s cubic-bezier(.4,0,.2,1);}
+  .raw-btn{width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:0 0 20px 20px;padding:10px;font-size:.78rem;cursor:pointer;transition:.2s;}
+  .raw-btn:hover{background:var(--border);color:var(--text);}
+  .raw-json{display:none;padding:16px 20px;font-family:monospace;font-size:.75rem;background:#05070d;white-space:pre-wrap;max-height:250px;overflow-y:auto;border-top:1px solid var(--border);}
+  .status-bar{margin-top:16px;padding:10px 14px;border-radius:10px;font-size:.8rem;display:none;align-items:center;gap:8px;}
+  .status-bar.loading{background:#1e1b33;border:1px solid var(--accent)44;color:var(--accent);display:flex;}
+  .status-bar.ok{background:#052e1d;border:1px solid var(--green)44;color:var(--green);display:flex;}
+  .status-bar.err{background:#2d0e0e;border:1px solid var(--red)44;color:var(--red);display:flex;}
+  .api-url{width:100%;max-width:680px;margin-bottom:16px;display:flex;gap:8px;align-items:center;}
+  .api-url input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:.8rem;outline:none;}
+  .api-url input:focus{border-color:var(--accent);}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+  .dot.ok{background:var(--green);}
+  .dot.err{background:var(--red);}
+  .reset-btn{margin-top:12px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:8px 18px;font-size:.8rem;cursor:pointer;transition:.2s;width:100%;}
+  .reset-btn:hover{border-color:var(--red);color:var(--red);}
+</style>
+</head>
+<body>
+
+<h1>🪪 ID Card Scanner</h1>
+<p class="sub">Upload an ID card photo — instantly extract name, DOB, ID number & more</p>
+
+<div class="api-url">
+  <span style="color:var(--muted);font-size:.78rem;white-space:nowrap;">API:</span>
+  <input id="apiBase" value="http://localhost:2000" placeholder="https://your-api.railway.app"/>
+  <span class="dot" id="dot"></span>
+</div>
+
+<div class="scanner-box">
+  <!-- Upload Zone -->
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept="image/*" onchange="onFileSelect(this)"/>
+    <div class="upload-icon">🪪</div>
+    <div class="upload-label"><b>Click or drag</b> an ID card photo here</div>
+    <div style="color:var(--muted);font-size:.75rem;margin-top:6px;">Supports Cambodian, passport, national ID · JPG, PNG</div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-wrap" id="previewWrap">
+    <img id="preview" src="" alt="ID preview"/>
+    <span class="preview-badge" id="previewName"></span>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar">
+    <div class="spinner" id="statusSpinner" style="display:none;"></div>
+    <span id="statusMsg"></span>
+  </div>
+
+  <!-- Scan Button -->
+  <button class="btn" id="scanBtn" onclick="doScan()" disabled>
+    🔍 Extract ID Information
+  </button>
+
+  <!-- Result -->
+  <div class="result" id="resultBox">
+    <div class="result-header">
+      <div class="result-icon" id="resultIcon">✅</div>
+      <div>
+        <div class="result-title" id="resultTitle">Extraction Complete</div>
+        <div class="result-sub" id="resultSub"></div>
+      </div>
+    </div>
+    <div class="conf-wrap" id="confWrap" style="display:none;">
+      <div class="conf-label">Face Match Confidence</div>
+      <div class="conf-bar"><div class="conf-fill" id="confFill" style="width:0%"></div></div>
+      <div style="font-size:.75rem;color:var(--muted);margin-top:4px;" id="confVal"></div>
+    </div>
+    <div class="fields" id="fields"></div>
+    <div class="raw-json" id="rawJson"></div>
+    <button class="raw-btn" onclick="toggleRaw()">{ } Show raw JSON</button>
+  </div>
+
+  <button class="reset-btn" id="resetBtn" onclick="reset()" style="display:none;">↺ Scan another ID</button>
+</div>
+
+<script>
+const base = () => document.getElementById('apiBase').value.replace(/\/$/,'');
+let selectedFile = null;
+let rawVisible = false;
+
+// Drag & drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if(f && f.type.startsWith('image/')) loadFile(f);
+});
+
+function onFileSelect(input) {
+  if(input.files[0]) loadFile(input.files[0]);
+}
+
+function loadFile(file) {
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('preview').src = e.target.result;
+    document.getElementById('previewWrap').style.display = 'block';
+    document.getElementById('previewName').textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
+  setStatus('');
+}
+
+function setStatus(msg, type='') {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'status-bar' + (type ? ' '+type : '');
+  document.getElementById('statusMsg').textContent = msg;
+  document.getElementById('statusSpinner').style.display = type === 'loading' ? 'block' : 'none';
+  if(!msg) bar.style.display = 'none';
+}
+
+async function doScan() {
+  if(!selectedFile) return;
+  document.getElementById('scanBtn').disabled = true;
+
+  try {
+    // 1. Start session
+    setStatus('Starting session…', 'loading');
+    const start = await post('/ekyc/start', {});
+    const requestId = start.requestId;
+
+    // 2. Upload file directly via NestJS → Supabase S3 (no CORS issue)
+    setStatus('Uploading ID photo…', 'loading');
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('requestId', requestId);
+    formData.append('type', 'id-front');
+    const uploadRes = await fetch(base() + '/ekyc/upload-file', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error('Upload failed: ' + (err?.message || uploadRes.status));
+    }
+    await uploadRes.json(); // key is already stored in session
+
+
+    // 5. Auto-complete liveness (selfie not required for ID-only extraction)
+    const liveness = await post('/ekyc/liveness/request', { requestId });
+    await post('/ekyc/liveness/confirm', {
+      requestId,
+      challengeId: liveness.challengeId,
+      action: liveness.action
+    });
+
+    // 6. Verify (OCR extraction)
+    setStatus('Extracting ID information…', 'loading');
+    const result = await post('/ekyc/verify', { requestId });
+
+    setStatus('Done!', 'ok');
+    showResult(result);
+
+  } catch(e) {
+    setStatus('Error: ' + (e.message || 'Unknown error'), 'err');
+    document.getElementById('scanBtn').disabled = false;
+  }
+}
+
+function showResult(r) {
+  const box = document.getElementById('resultBox');
+  box.style.display = 'block';
+
+  // Header
+  const ok = r.ocrPassed !== false;
+  document.getElementById('resultIcon').textContent = ok ? '✅' : '⚠️';
+  document.getElementById('resultIcon').className = 'result-icon ' + (ok ? 'ok' : 'fail');
+  document.getElementById('resultTitle').textContent = ok ? 'ID Extracted Successfully' : 'Partial Extraction';
+  document.getElementById('resultSub').textContent = `Session: ${r.requestId || ''}`;
+
+  // Face match confidence (if available)
+  if (r.faceMatchConfidence != null) {
+    document.getElementById('confWrap').style.display = 'block';
+    const pct = r.faceMatchConfidence;
+    const fill = document.getElementById('confFill');
+    fill.style.width = pct + '%';
+    fill.style.background = pct > 70 ? '#10b981' : pct > 40 ? '#f59e0b' : '#ef4444';
+    document.getElementById('confVal').textContent = pct + '% confidence';
+  }
+
+  // Fields
+  const fields = document.getElementById('fields');
+  fields.innerHTML = '';
+  const ocrPassed = r.ocrPassed || r.mrzDetected || (r.ocrConfidence && r.ocrConfidence >= 20) || r.verified;
+  const data = [
+    ['Full Name',       r.extractedName       || r.name       || '—'],
+    ['Date of Birth',   r.extractedDob        || r.dob        || '—'],
+    ['ID Number',       r.extractedIdNumber   || r.idNumber   || '—'],
+    ['Gender',          r.extractedSex        || r.extractedGender || r.gender || '—'],
+    ['Nationality',     r.extractedNationality|| r.nationality|| '—'],
+    ['Expiry Date',     r.extractedExpiry     || r.expiry     || '—'],
+    ['Issue Date',      r.extractedIssueDate  || r.issueDate  || '—'],
+    ['Address',         r.extractedAddress    || r.address    || '—'],
+    ['OCR Status',      ocrPassed ? '✅ Passed' : '⚠️ Partial'],
+    ['Verified',        r.verified ? '✅ Yes' : '❌ No'],
+  ];
+
+  data.forEach(([label, value]) => {
+    if(value === '—' && label !== 'OCR Status' && label !== 'Verified') return;
+    const isLong = String(value).length > 30;
+    const div = document.createElement('div');
+    div.className = 'field' + (isLong ? ' full' : '');
+    div.innerHTML = `<div class="field-label">${label}</div><div class="field-value">${value}</div>`;
+    fields.appendChild(div);
+  });
+
+  // Raw JSON
+  document.getElementById('rawJson').textContent = JSON.stringify(r, null, 2);
+  document.getElementById('resetBtn').style.display = 'block';
+
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleRaw() {
+  rawVisible = !rawVisible;
+  document.getElementById('rawJson').style.display = rawVisible ? 'block' : 'none';
+  document.querySelector('.raw-btn').textContent = rawVisible ? '{ } Hide raw JSON' : '{ } Show raw JSON';
+}
+
+function reset() {
+  selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('scanBtn').disabled = true;
+  setStatus('');
+  rawVisible = false;
+}
+
+async function post(path, body) {
+  const r = await fetch(base() + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(json?.message || `HTTP ${r.status}`);
+  return json;
+}
+
+// Ping API
+fetch(base() + '/').then(r => {
+  document.getElementById('dot').className = 'dot ' + (r.ok ? 'ok' : 'err');
+}).catch(() => {
+  document.getElementById('dot').className = 'dot err';
+});
+
+document.getElementById('apiBase').addEventListener('change', () => {
+  fetch(document.getElementById('apiBase').value.replace(/\//,'')+'/').then(r=>{
+    document.getElementById('dot').className = 'dot '+(r.ok?'ok':'err');
+  }).catch(()=>document.getElementById('dot').className='dot err');
+});
+</script>
+</body>
+</html>

@@ -5,6 +5,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { writeFile, readFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { VerifyIdentityDto } from './dto/verify-identity.dto';
 import { EkycStore, EkycSessionRecord } from './ekyc.store';
 import { OcrService } from './ocr.service';
@@ -69,6 +72,38 @@ export class EkycService {
     await this.store.set(session);
     return { requestId: payload.requestId, status: 'selfie-uploaded', key: payload.key };
   }
+
+  /**
+   * Upload a file (browser → NestJS).
+   * Saves to local /tmp/ekyc-uploads/ to bypass Supabase S3 SDK auth issues.
+   * Stores a 'local:<path>' key — downloadImage handles both local and S3 keys.
+   */
+  async uploadFile(payload: {
+    requestId: string;
+    file: Express.Multer.File;
+    type: 'id-front' | 'id-back' | 'selfie';
+  }) {
+    const session = await this.getSession(payload.requestId);
+
+    // Save to local temp directory
+    const uploadDir = join(tmpdir(), 'ekyc-uploads');
+    await mkdir(uploadDir, { recursive: true });
+    const filename = `${randomUUID()}-${payload.file.originalname}`;
+    const filepath = join(uploadDir, filename);
+    await writeFile(filepath, payload.file.buffer);
+
+    // Store as 'local:<path>' key so downloadImage can read it directly
+    const key = `local:${filepath}`;
+
+    if (payload.type === 'id-front') session.idFrontKey = key;
+    else if (payload.type === 'id-back') session.idBackKey = key;
+    else session.selfieKey = key;
+
+    await this.store.set(session);
+    this.logger.log(`Saved ${payload.type} locally → ${filepath}`);
+    return { requestId: payload.requestId, status: `${payload.type}-uploaded`, key };
+  }
+
 
   // ─────────────────────────────────────────────────────────────────────────
   //  Liveness
@@ -145,9 +180,8 @@ export class EkycService {
     if (!session.idFrontKey) {
       throw new BadRequestException('ID front image has not been uploaded yet');
     }
-    if (!session.selfieKey) {
-      throw new BadRequestException('Selfie image has not been uploaded yet');
-    }
+    // Selfie is optional — if missing, only OCR is run (no face match)
+    const selfieOptional = !session.selfieKey;
     if (!session.livenessPassed) {
       throw new BadRequestException(
         'Liveness check must be completed before verification. ' +
@@ -157,12 +191,8 @@ export class EkycService {
 
     this.logger.log(`[${payload.requestId}] Starting verification...`);
 
-    // ── Step 1: Download images from S3 ─────────────────────────────────────
-    this.logger.log(`[${payload.requestId}] Downloading images from S3...`);
-    const [idBuffer, selfieBuffer] = await Promise.all([
-      this.s3.downloadImage(session.idFrontKey),
-      this.s3.downloadImage(session.selfieKey),
-    ]);
+    // ── Step 1: Download ID image ────────────────────────────────────────────
+    const idBuffer = await this.s3.downloadImage(session.idFrontKey);
 
     // ── Step 2: Run OCR on ID image ──────────────────────────────────────────
     this.logger.log(`[${payload.requestId}] Running OCR...`);
@@ -171,24 +201,30 @@ export class EkycService {
       `[${payload.requestId}] OCR done — confidence: ${ocrResult.confidence.toFixed(1)}%`,
     );
 
-    // ── Step 3: Face match via CompreFace ────────────────────────────────────
-    this.logger.log(`[${payload.requestId}] Running CompreFace face match...`);
-    // CompreFace: source = selfie (live), target = ID card
-    const faceResult = await this.faceMatch.compareFaces(selfieBuffer, idBuffer);
-    this.logger.log(
-      `[${payload.requestId}] Face match done — ${faceResult.message}`,
-    );
+    // ── Step 3: Face match (only if selfie uploaded) ─────────────────────────
+    let faceResult: Awaited<ReturnType<typeof this.faceMatch.compareFaces>> | null = null;
+    if (!selfieOptional && session.selfieKey) {
+      this.logger.log(`[${payload.requestId}] Running face match...`);
+      const selfieBuffer = await this.s3.downloadImage(session.selfieKey);
+      faceResult = await this.faceMatch.compareFaces(selfieBuffer, idBuffer);
+      this.logger.log(`[${payload.requestId}] Face match done — ${faceResult.message}`);
+    } else {
+      this.logger.log(`[${payload.requestId}] No selfie — skipping face match (OCR only)`);
+    }
 
     // ── Step 4: Determine overall result ─────────────────────────────────────
+    const faceMatched = faceResult?.matched ?? true; // no selfie = skip face check
+    // Lower confidence threshold for OCR-only mode (Khmer IDs score lower with Tesseract)
+    const ocrThreshold = selfieOptional ? 10 : 30;
     const verified =
-      faceResult.matched &&
-      ocrResult.confidence > 30 &&
+      faceMatched &&
+      ocrResult.confidence > ocrThreshold &&
       (session.livenessPassed ?? false);
 
     const message = verified
-      ? 'Verification successful'
-      : !faceResult.matched
-        ? faceResult.message
+      ? selfieOptional ? 'OCR extraction successful (no face match — selfie not provided)' : 'Verification successful'
+      : !faceMatched
+        ? (faceResult?.message ?? 'Face match failed')
         : !(session.livenessPassed ?? false)
           ? 'Liveness check not passed'
           : 'OCR confidence too low — image may be unclear';
@@ -196,14 +232,18 @@ export class EkycService {
     const result = {
       verified,
       message,
+      ocrOnly: selfieOptional,
+      mrzDetected: ocrResult.mrzDetected ?? false,
       livenessPassed: session.livenessPassed ?? false,
       extractedName: ocrResult.extractedName,
       extractedIdNumber: ocrResult.extractedIdNumber,
       extractedDob: ocrResult.extractedDob,
       extractedExpiry: ocrResult.extractedExpiry,
+      extractedNationality: ocrResult.extractedNationality,
+      extractedSex: ocrResult.extractedSex,
       ocrConfidence: parseFloat(ocrResult.confidence.toFixed(1)),
-      faceMatchConfidence: faceResult.confidence,
-      faceMatchSimilarity: faceResult.similarity,
+      faceMatchConfidence: faceResult?.confidence ?? null,
+      faceMatchSimilarity: faceResult?.similarity ?? null,
     };
 
     session.result = result;

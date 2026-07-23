@@ -17,13 +17,17 @@ export interface EkycSessionRecord {
   result?: {
     verified: boolean;
     message: string;
+    ocrOnly?: boolean;
+    mrzDetected?: boolean;
     extractedName?: string;
     extractedIdNumber?: string;
     extractedDob?: string;
     extractedExpiry?: string;
+    extractedNationality?: string;
+    extractedSex?: string;
     ocrConfidence?: number;
-    faceMatchConfidence?: number;
-    faceMatchSimilarity?: number;
+    faceMatchConfidence?: number | null;
+    faceMatchSimilarity?: number | null;
     livenessPassed?: boolean;
   };
 }
