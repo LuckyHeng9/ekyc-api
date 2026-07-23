@@ -4,7 +4,6 @@ import {
   Get,
   Param,
   Post,
-  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -108,7 +107,9 @@ export class EkycController {
   @Post('upload-file')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload file via NestJS → S3 (browser-safe, no CORS)' })
+  @ApiOperation({
+    summary: 'Upload file via NestJS → S3 (browser-safe, no CORS)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -119,12 +120,20 @@ export class EkycController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Returns { key, status, requestId }' })
+  @ApiResponse({
+    status: 201,
+    description: 'Returns { key, status, requestId }',
+  })
   uploadFile(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { requestId: string; type: 'id-front' | 'id-back' | 'selfie' },
+    @Body()
+    body: { requestId: string; type: 'id-front' | 'id-back' | 'selfie' },
   ) {
-    return this.ekycService.uploadFile({ requestId: body.requestId, file, type: body.type });
+    return this.ekycService.uploadFile({
+      requestId: body.requestId,
+      file,
+      type: body.type,
+    });
   }
 
   // ─── Liveness ────────────────────────────────────────────────────────────
@@ -186,7 +195,10 @@ export class EkycController {
     },
   })
   @ApiResponse({ status: 201, description: 'Liveness check passed' })
-  @ApiResponse({ status: 400, description: 'Wrong action or challenge expired' })
+  @ApiResponse({
+    status: 400,
+    description: 'Wrong action or challenge expired',
+  })
   confirmLiveness(
     @Body()
     payload: {

@@ -46,10 +46,16 @@ export class S3Service {
     try {
       await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
     } catch (error: unknown) {
-      const err = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      const err = error as {
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
       const httpStatus = err?.$metadata?.httpStatusCode ?? 0;
       // Treat 409 (already exists), 403 (no permission = already exists in Supabase) as OK
-      const ignore = err?.name === 'BucketAlreadyOwnedByYou' || httpStatus === 409 || httpStatus === 403;
+      const ignore =
+        err?.name === 'BucketAlreadyOwnedByYou' ||
+        httpStatus === 409 ||
+        httpStatus === 403;
       if (!ignore) throw error;
     }
   }

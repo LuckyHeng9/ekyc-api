@@ -54,7 +54,12 @@ export class OcrService {
     // Trim each line, strip leading non-alphanumeric noise, filter short/empty lines
     const cleanedLines = text
       .split('\n')
-      .map((l) => l.trim().toUpperCase().replace(/^[^A-Z0-9<]+/, ''))
+      .map((l) =>
+        l
+          .trim()
+          .toUpperCase()
+          .replace(/^[^A-Z0-9<]+/, ''),
+      )
       .filter((l) => l.length >= 10);
 
     // Standardize MRZ characters
@@ -69,7 +74,9 @@ export class OcrService {
     // Line 1: Starts with I (e.g. IDKHM1806714117...) and contains document number digits
     const line1Idx = mrzLines.findIndex(
       (l) =>
-        (/^I[A-Z0-9<][A-Z]{3}/.test(l) || /^ID[A-Z]{3}/.test(l) || /^I[A-Z0-9<]{4}/.test(l)) &&
+        (/^I[A-Z0-9<][A-Z]{3}/.test(l) ||
+          /^ID[A-Z]{3}/.test(l) ||
+          /^I[A-Z0-9<]{4}/.test(l)) &&
         /\d{5,}/.test(l),
     );
 
@@ -86,8 +93,10 @@ export class OcrService {
         const line3 =
           remaining
             .slice(line2Idx + 1)
-            .find((l) => /[A-Z]{2,}[<KLIXZ4]{1,}[A-Z]{2,}/.test(l) || l.includes('<<')) ||
-          remaining.find((l) => l !== line2 && /[A-Z]{2,}/.test(l));
+            .find(
+              (l) =>
+                /[A-Z]{2,}[<KLIXZ4]{1,}[A-Z]{2,}/.test(l) || l.includes('<<'),
+            ) || remaining.find((l) => l !== line2 && /[A-Z]{2,}/.test(l));
 
         if (line3) {
           this.logger.log(
@@ -99,7 +108,9 @@ export class OcrService {
     }
 
     // ── Strategy 2: Any TD1 (3 lines ≥ 25 chars) ─────────────────────────────
-    const mrzLike = mrzLines.filter((l) => l.length >= 25 && /^[A-Z0-9<]{25,}$/.test(l));
+    const mrzLike = mrzLines.filter(
+      (l) => l.length >= 25 && /^[A-Z0-9<]{25,}$/.test(l),
+    );
     if (mrzLike.length >= 3) {
       return this.parseTD1(mrzLike[0], mrzLike[1], mrzLike[2]);
     }
@@ -111,7 +122,11 @@ export class OcrService {
     return null;
   }
 
-  private parseTD1(line1: string, line2: string, line3: string): Partial<OcrResult> {
+  private parseTD1(
+    line1: string,
+    line2: string,
+    line3: string,
+  ): Partial<OcrResult> {
     // Line 1: [type 2][country 3][docNo 9][check 1][optional 15]
     const docNumber = line1.slice(5, 14).replace(/</g, '').replace(/\D/g, '');
 
@@ -128,7 +143,10 @@ export class OcrService {
 
     // Nationality: 3 letters around position 15
     const natMatch = line2.slice(15, 18).replace(/[^A-Z]/g, '');
-    const nationality = natMatch.length === 3 ? natMatch : (line2.match(/[A-Z]{3}/)?.[0] ?? 'KHM');
+    const nationality =
+      natMatch.length === 3
+        ? natMatch
+        : (line2.match(/[A-Z]{3}/)?.[0] ?? 'KHM');
 
     // Line 3: [surname]<<[given names]
     const fullName = this.cleanMrzName(line3);
@@ -144,21 +162,27 @@ export class OcrService {
   }
 
   private parseTD3(line1: string, line2: string): Partial<OcrResult> {
-    const nameParts   = line1.slice(5).replace(/</g, ' ').trim().split(/\s{2,}/);
-    const fullName    = [nameParts[0], nameParts[1]].filter(Boolean).join(' ') || undefined;
-    const docNumber   = line2.slice(0, 9).replace(/</g, '');
+    const nameParts = line1
+      .slice(5)
+      .replace(/</g, ' ')
+      .trim()
+      .split(/\s{2,}/);
+    const fullName =
+      [nameParts[0], nameParts[1]].filter(Boolean).join(' ') || undefined;
+    const docNumber = line2.slice(0, 9).replace(/</g, '');
     const nationality = line2.slice(10, 13).replace(/</g, '');
-    const dobRaw      = line2.slice(13, 19);
-    const sex         = line2[20] === 'M' ? 'Male' : line2[20] === 'F' ? 'Female' : undefined;
-    const expiryRaw   = line2.slice(21, 27);
+    const dobRaw = line2.slice(13, 19);
+    const sex =
+      line2[20] === 'M' ? 'Male' : line2[20] === 'F' ? 'Female' : undefined;
+    const expiryRaw = line2.slice(21, 27);
 
     return {
-      extractedIdNumber:    docNumber    || undefined,
-      extractedName:        fullName,
-      extractedDob:         this.fmtDate(dobRaw),
-      extractedExpiry:      this.fmtDate(expiryRaw),
-      extractedNationality: nationality  || undefined,
-      extractedSex:         sex,
+      extractedIdNumber: docNumber || undefined,
+      extractedName: fullName,
+      extractedDob: this.fmtDate(dobRaw),
+      extractedExpiry: this.fmtDate(expiryRaw),
+      extractedNationality: nationality || undefined,
+      extractedSex: sex,
     };
   }
 
@@ -168,15 +192,21 @@ export class OcrService {
     const mm = raw.slice(2, 4);
     const dd = raw.slice(4, 6);
     const curYY = new Date().getFullYear() % 100;
-    const year  = yy <= curYY + 10 ? 2000 + yy : 1900 + yy;
+    const year = yy <= curYY + 10 ? 2000 + yy : 1900 + yy;
     return `${year}-${mm}-${dd}`;
   }
 
   private cleanMrzName(line3: string): string | undefined {
     // 1. Strip leading non-alpha noise and trailing chevrons/spaces ONLY (never strip letters like L at word end)
-    let raw = line3.toUpperCase().replace(/^[^A-Z]+/, '').replace(/[<\s]+$/, '');
+    const raw = line3
+      .toUpperCase()
+      .replace(/^[^A-Z]+/, '')
+      .replace(/[<\s]+$/, '');
 
-    const parts = raw.split(/<{2,}/).map((p) => p.trim()).filter(Boolean);
+    const parts = raw
+      .split(/<{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean);
     if (!parts.length) return undefined;
 
     const surname = parts[0].replace(/[^A-Z]/g, '');
@@ -200,7 +230,11 @@ export class OcrService {
 
       // If a single letter (like 'L') follows a word of length >= 3, merge it back (e.g. SOPHOR + L -> SOPHORL)
       const lastIdx = validGivenWords.length - 1;
-      if (w.length === 1 && lastIdx >= 0 && validGivenWords[lastIdx].length >= 3) {
+      if (
+        w.length === 1 &&
+        lastIdx >= 0 &&
+        validGivenWords[lastIdx].length >= 3
+      ) {
         validGivenWords[lastIdx] += w;
       } else {
         validGivenWords.push(w);
@@ -237,17 +271,28 @@ export class OcrService {
     return undefined;
   }
 
-  private extractDate(text: string, type: 'dob' | 'expiry'): string | undefined {
-    const keywords = type === 'dob'
-      ? ['Date of Birth', 'DOB', 'Born']
-      : ['Expiry', 'Expiration', 'Valid Until'];
+  private extractDate(
+    text: string,
+    type: 'dob' | 'expiry',
+  ): string | undefined {
+    const keywords =
+      type === 'dob'
+        ? ['Date of Birth', 'DOB', 'Born']
+        : ['Expiry', 'Expiration', 'Valid Until'];
 
     for (const kw of keywords) {
-      const m = text.match(new RegExp(`${kw}[:\\s]+([0-9]{1,2}[\\s/\\-][A-Za-z0-9]{1,3}[\\s/\\-][0-9]{2,4})`, 'i'));
+      const m = text.match(
+        new RegExp(
+          `${kw}[:\\s]+([0-9]{1,2}[\\s/\\-][A-Za-z0-9]{1,3}[\\s/\\-][0-9]{2,4})`,
+          'i',
+        ),
+      );
       if (m?.[1]) return m[1].trim().replace(/\s+/g, '-');
     }
 
-    const all = [...text.matchAll(/\b(\d{1,2}[\s/-]\d{1,2}[\s/-]\d{2,4})\b/g)].map((m) => m[1]);
+    const all = [
+      ...text.matchAll(/\b(\d{1,2}[\s/-]\d{1,2}[\s/-]\d{2,4})\b/g),
+    ].map((m) => m[1]);
     if (!all.length) return undefined;
     return (type === 'dob' ? all[0] : all[all.length - 1]).replace(/\s+/g, '-');
   }

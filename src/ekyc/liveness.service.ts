@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-export type LivenessAction = 'blink' | 'smile' | 'turn_left' | 'turn_right' | 'nod';
+export type LivenessAction =
+  'blink' | 'smile' | 'turn_left' | 'turn_right' | 'nod';
 
 export interface LivenessChallenge {
   /** Unique token to reference this challenge */
@@ -24,8 +25,14 @@ export interface LivenessResult {
 const ACTIONS: { action: LivenessAction; instruction: string }[] = [
   { action: 'blink', instruction: 'Please blink both eyes' },
   { action: 'smile', instruction: 'Please smile at the camera' },
-  { action: 'turn_left', instruction: 'Please turn your head slightly to the left' },
-  { action: 'turn_right', instruction: 'Please turn your head slightly to the right' },
+  {
+    action: 'turn_left',
+    instruction: 'Please turn your head slightly to the left',
+  },
+  {
+    action: 'turn_right',
+    instruction: 'Please turn your head slightly to the right',
+  },
   { action: 'nod', instruction: 'Please nod your head up and down' },
 ];
 
@@ -115,7 +122,9 @@ export class LivenessService {
       };
     }
 
-    this.logger.log(`Liveness challenge [${challengeId}] PASSED: ${claimedAction}`);
+    this.logger.log(
+      `Liveness challenge [${challengeId}] PASSED: ${claimedAction}`,
+    );
     return {
       passed: true,
       action: claimedAction,

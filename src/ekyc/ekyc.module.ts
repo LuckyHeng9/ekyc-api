@@ -8,6 +8,12 @@ import { LivenessService } from './liveness.service';
 
 @Module({
   controllers: [EkycController],
-  providers: [EkycService, S3Service, OcrService, CompreFaceService, LivenessService],
+  providers: [
+    EkycService,
+    S3Service,
+    OcrService,
+    CompreFaceService,
+    LivenessService,
+  ],
 })
 export class EkycModule {}

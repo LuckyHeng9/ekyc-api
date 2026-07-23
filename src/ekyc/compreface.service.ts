@@ -8,6 +8,19 @@ export interface FaceMatchResult {
   message: string;
 }
 
+interface LuxandSubjectResponse {
+  uuid?: string;
+}
+
+interface LuxandMatch {
+  uuid?: string;
+  similarity?: number;
+}
+
+interface LuxandSearchResult {
+  matches?: LuxandMatch[];
+}
+
 /**
  * Face verification using Luxand.cloud Face API
  *
@@ -58,7 +71,12 @@ export class CompreFaceService {
       // Step 1: Detect + store face from ID card → get uuid
       const idUuid = await this.storeFace(targetBuffer, 'ID card');
       if (!idUuid) {
-        return { matched: false, similarity: 0, confidence: 0, message: 'No face detected in ID card' };
+        return {
+          matched: false,
+          similarity: 0,
+          confidence: 0,
+          message: 'No face detected in ID card',
+        };
       }
 
       // Step 2: Verify selfie against stored ID face
@@ -70,7 +88,12 @@ export class CompreFaceService {
       return result;
     } catch (err) {
       this.logger.error(`Luxand API error: ${err}`);
-      return { matched: false, similarity: 0, confidence: 0, message: 'Face comparison failed' };
+      return {
+        matched: false,
+        similarity: 0,
+        confidence: 0,
+        message: 'Face comparison failed',
+      };
     }
   }
 
@@ -78,9 +101,15 @@ export class CompreFaceService {
    * Upload a face photo to Luxand temporary subject store.
    * Returns the Luxand uuid for the stored face.
    */
-  private async storeFace(buffer: Buffer, label: string): Promise<string | null> {
+  private async storeFace(
+    buffer: Buffer,
+    label: string,
+  ): Promise<string | null> {
     const form = new FormData();
-    form.append('photo', buffer, { filename: 'face.jpg', contentType: 'image/jpeg' });
+    form.append('photo', buffer, {
+      filename: 'face.jpg',
+      contentType: 'image/jpeg',
+    });
     form.append('name', `ekyc_${Date.now()}`);
 
     const res = await fetch('https://us-api.luxand.cloud/subject', {
@@ -94,12 +123,13 @@ export class CompreFaceService {
 
     if (!res.ok) {
       const err = await res.text();
-      this.logger.error(`Luxand store face failed for ${label} (${res.status}): ${err}`);
+      this.logger.error(
+        `Luxand store face failed for ${label} (${res.status}): ${err}`,
+      );
       return null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const json: any = await res.json();
+    const json = (await res.json()) as LuxandSubjectResponse;
     const uuid: string | undefined = json?.uuid;
 
     if (!uuid) {
@@ -114,9 +144,15 @@ export class CompreFaceService {
   /**
    * Verify a selfie against a stored Luxand subject uuid.
    */
-  private async verifyFace(selfieBuffer: Buffer, uuid: string): Promise<FaceMatchResult> {
+  private async verifyFace(
+    selfieBuffer: Buffer,
+    uuid: string,
+  ): Promise<FaceMatchResult> {
     const form = new FormData();
-    form.append('photo', selfieBuffer, { filename: 'selfie.jpg', contentType: 'image/jpeg' });
+    form.append('photo', selfieBuffer, {
+      filename: 'selfie.jpg',
+      contentType: 'image/jpeg',
+    });
 
     const res = await fetch(`https://us-api.luxand.cloud/photo/search`, {
       method: 'POST',
@@ -130,19 +166,29 @@ export class CompreFaceService {
     if (!res.ok) {
       const err = await res.text();
       this.logger.error(`Luxand verify failed (${res.status}): ${err}`);
-      return { matched: false, similarity: 0, confidence: 0, message: `Luxand error: ${res.status}` };
+      return {
+        matched: false,
+        similarity: 0,
+        confidence: 0,
+        message: `Luxand error: ${res.status}`,
+      };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const results: any[] = await res.json();
+    const results = (await res.json()) as LuxandSearchResult[];
     if (!results || results.length === 0) {
-      return { matched: false, similarity: 0, confidence: 0, message: 'No face detected in selfie' };
+      return {
+        matched: false,
+        similarity: 0,
+        confidence: 0,
+        message: 'No face detected in selfie',
+      };
     }
 
     // Find match for our stored uuid
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const match = results[0]?.matches?.find((m: any) => m.uuid === uuid);
-    const similarity: number = match?.similarity ?? results[0]?.matches?.[0]?.similarity ?? 0;
+
+    const match = results[0]?.matches?.find((m: LuxandMatch) => m.uuid === uuid);
+    const similarity: number =
+      match?.similarity ?? results[0]?.matches?.[0]?.similarity ?? 0;
     const matched = similarity >= this.threshold;
     const confidence = Math.round(similarity * 100);
 

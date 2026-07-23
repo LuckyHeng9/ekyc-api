@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { writeFile, readFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { VerifyIdentityDto } from './dto/verify-identity.dto';
@@ -56,21 +56,33 @@ export class EkycService {
     const session = await this.getSession(payload.requestId);
     session.idFrontKey = payload.key;
     await this.store.set(session);
-    return { requestId: payload.requestId, status: 'id-front-uploaded', key: payload.key };
+    return {
+      requestId: payload.requestId,
+      status: 'id-front-uploaded',
+      key: payload.key,
+    };
   }
 
   async uploadIdBack(payload: { requestId: string; key: string }) {
     const session = await this.getSession(payload.requestId);
     session.idBackKey = payload.key;
     await this.store.set(session);
-    return { requestId: payload.requestId, status: 'id-back-uploaded', key: payload.key };
+    return {
+      requestId: payload.requestId,
+      status: 'id-back-uploaded',
+      key: payload.key,
+    };
   }
 
   async uploadSelfie(payload: { requestId: string; key: string }) {
     const session = await this.getSession(payload.requestId);
     session.selfieKey = payload.key;
     await this.store.set(session);
-    return { requestId: payload.requestId, status: 'selfie-uploaded', key: payload.key };
+    return {
+      requestId: payload.requestId,
+      status: 'selfie-uploaded',
+      key: payload.key,
+    };
   }
 
   /**
@@ -101,9 +113,12 @@ export class EkycService {
 
     await this.store.set(session);
     this.logger.log(`Saved ${payload.type} locally → ${filepath}`);
-    return { requestId: payload.requestId, status: `${payload.type}-uploaded`, key };
+    return {
+      requestId: payload.requestId,
+      status: `${payload.type}-uploaded`,
+      key,
+    };
   }
-
 
   // ─────────────────────────────────────────────────────────────────────────
   //  Liveness
@@ -185,7 +200,7 @@ export class EkycService {
     if (!session.livenessPassed) {
       throw new BadRequestException(
         'Liveness check must be completed before verification. ' +
-        'Call POST /ekyc/liveness/request then POST /ekyc/liveness/confirm.',
+          'Call POST /ekyc/liveness/request then POST /ekyc/liveness/confirm.',
       );
     }
 
@@ -202,14 +217,20 @@ export class EkycService {
     );
 
     // ── Step 3: Face match (only if selfie uploaded) ─────────────────────────
-    let faceResult: Awaited<ReturnType<typeof this.faceMatch.compareFaces>> | null = null;
+    let faceResult: Awaited<
+      ReturnType<typeof this.faceMatch.compareFaces>
+    > | null = null;
     if (!selfieOptional && session.selfieKey) {
       this.logger.log(`[${payload.requestId}] Running face match...`);
       const selfieBuffer = await this.s3.downloadImage(session.selfieKey);
       faceResult = await this.faceMatch.compareFaces(selfieBuffer, idBuffer);
-      this.logger.log(`[${payload.requestId}] Face match done — ${faceResult.message}`);
+      this.logger.log(
+        `[${payload.requestId}] Face match done — ${faceResult.message}`,
+      );
     } else {
-      this.logger.log(`[${payload.requestId}] No selfie — skipping face match (OCR only)`);
+      this.logger.log(
+        `[${payload.requestId}] No selfie — skipping face match (OCR only)`,
+      );
     }
 
     // ── Step 4: Determine overall result ─────────────────────────────────────
@@ -222,7 +243,9 @@ export class EkycService {
       (session.livenessPassed ?? false);
 
     const message = verified
-      ? selfieOptional ? 'OCR extraction successful (no face match — selfie not provided)' : 'Verification successful'
+      ? selfieOptional
+        ? 'OCR extraction successful (no face match — selfie not provided)'
+        : 'Verification successful'
       : !faceMatched
         ? (faceResult?.message ?? 'Face match failed')
         : !(session.livenessPassed ?? false)
