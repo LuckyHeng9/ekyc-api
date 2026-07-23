@@ -127,12 +127,12 @@ export class EkycController {
   uploadFile(
     @UploadedFile() file: Express.Multer.File,
     @Body()
-    body: { requestId: string; type: 'id-front' | 'id-back' | 'selfie' },
+    body?: { requestId?: string; type?: 'id-front' | 'id-back' | 'selfie' },
   ) {
     return this.ekycService.uploadFile({
-      requestId: body.requestId,
+      requestId: body?.requestId,
       file,
-      type: body.type,
+      type: body?.type,
     });
   }
 

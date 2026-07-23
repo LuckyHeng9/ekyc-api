@@ -1,4 +1,5 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
   ApiConsumes,
@@ -8,7 +9,7 @@ import {
 import { Auth } from '../common/decorators/auth.decorator';
 import { UploadService } from './upload.service';
 
-@Controller('upload')
+@Controller(['upload', 'uploads', 'api/v1/upload', 'api/v1/uploads'])
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
@@ -55,5 +56,24 @@ export class UploadController {
   @ApiResponse({ status: 201, description: 'Presigned view URL created' })
   async createPresignedView(@Body() body: { key: string }) {
     return this.uploadService.createPresignedView(body);
+  }
+
+  @Post('file')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: '2-Step Backend Upload: Upload file via NestJS → Supabase S3 + OCR (bypasses browser 403 CORS)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Returns { key, url, ocrResult }' })
+  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+    return this.uploadService.uploadFile(file);
   }
 }

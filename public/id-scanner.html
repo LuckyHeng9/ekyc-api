@@ -184,10 +184,21 @@ async function doScan() {
       const err = await uploadRes.json().catch(() => ({}));
       throw new Error('Upload failed: ' + (err?.message || uploadRes.status));
     }
-    await uploadRes.json(); // key is already stored in session
+    const uploadData = await uploadRes.json();
 
+    if (uploadData.ocrResult) {
+      setStatus('Extracted OCR from Supabase upload!', 'ok');
+      showResult({
+        requestId,
+        ...uploadData.ocrResult,
+        verified: true,
+        storageKey: uploadData.key,
+        storageUrl: uploadData.url,
+      });
+      return;
+    }
 
-    // 5. Auto-complete liveness (selfie not required for ID-only extraction)
+    // Auto-complete liveness & verify if instant OCR wasn't present
     const liveness = await post('/ekyc/liveness/request', { requestId });
     await post('/ekyc/liveness/confirm', {
       requestId,
@@ -195,7 +206,6 @@ async function doScan() {
       action: liveness.action
     });
 
-    // 6. Verify (OCR extraction)
     setStatus('Extracting ID information…', 'loading');
     const result = await post('/ekyc/verify', { requestId });
 

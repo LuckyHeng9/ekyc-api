@@ -34,37 +34,63 @@ export interface EkycSessionRecord {
 
 export class EkycStore {
   private collection: Collection<EkycSessionRecord> | null = null;
+  private readonly memoryStore = new Map<string, EkycSessionRecord>();
 
   private async connect() {
     if (this.collection) {
       return this.collection;
     }
 
-    const db = await getDatabase();
-    const collectionName = process.env.MONGO_COLLECTION ?? 'ekyc_sessions';
-    this.collection = db.collection<EkycSessionRecord>(collectionName);
-    await this.collection.createIndex({ requestId: 1 }, { unique: true });
-    return this.collection;
+    try {
+      const db = await getDatabase();
+      const collectionName = process.env.MONGO_COLLECTION ?? 'ekyc_sessions';
+      this.collection = db.collection<EkycSessionRecord>(collectionName);
+      await this.collection.createIndex({ requestId: 1 }, { unique: true });
+      return this.collection;
+    } catch {
+      return null;
+    }
   }
 
   async get(requestId: string): Promise<EkycSessionRecord | undefined> {
-    const collection = await this.connect();
-    const record = await collection.findOne({ requestId });
-    return record ? record : undefined;
+    try {
+      const collection = await this.connect();
+      if (collection) {
+        const record = await collection.findOne({ requestId });
+        if (record) return record;
+      }
+    } catch {
+      // Fall back to in-memory store
+    }
+    return this.memoryStore.get(requestId);
   }
 
   async set(record: EkycSessionRecord) {
-    const collection = await this.connect();
-    await collection.updateOne(
-      { requestId: record.requestId },
-      { $set: record },
-      { upsert: true },
-    );
+    this.memoryStore.set(record.requestId, record);
+    try {
+      const collection = await this.connect();
+      if (collection) {
+        await collection.updateOne(
+          { requestId: record.requestId },
+          { $set: record },
+          { upsert: true },
+        );
+      }
+    } catch {
+      // Fall back to in-memory store
+    }
     return record;
   }
 
   async delete(requestId: string) {
-    const collection = await this.connect();
-    await collection.deleteOne({ requestId });
+    this.memoryStore.delete(requestId);
+    try {
+      const collection = await this.connect();
+      if (collection) {
+        await collection.deleteOne({ requestId });
+      }
+    } catch {
+      // Ignore
+    }
   }
 }

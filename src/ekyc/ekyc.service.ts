@@ -55,22 +55,47 @@ export class EkycService {
   async uploadIdFront(payload: { requestId: string; key: string }) {
     const session = await this.getSession(payload.requestId);
     session.idFrontKey = payload.key;
+
+    let ocrResult: Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
+    try {
+      this.logger.log(`[${payload.requestId}] Extracting OCR from ID front key: ${payload.key}...`);
+      const idBuffer = await this.s3.downloadImage(payload.key);
+      ocrResult = await this.ocr.extractFromImage(idBuffer);
+      this.logger.log(
+        `[${payload.requestId}] Instant OCR done — confidence: ${ocrResult.confidence.toFixed(1)}%`,
+      );
+    } catch (err) {
+      this.logger.warn(`[${payload.requestId}] Instant OCR skipped for key ${payload.key}: ${err}`);
+    }
+
     await this.store.set(session);
     return {
       requestId: payload.requestId,
       status: 'id-front-uploaded',
       key: payload.key,
+      ocrResult,
     };
   }
 
   async uploadIdBack(payload: { requestId: string; key: string }) {
     const session = await this.getSession(payload.requestId);
     session.idBackKey = payload.key;
+
+    let ocrResult: Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
+    try {
+      this.logger.log(`[${payload.requestId}] Extracting OCR from ID back key: ${payload.key}...`);
+      const idBuffer = await this.s3.downloadImage(payload.key);
+      ocrResult = await this.ocr.extractFromImage(idBuffer);
+    } catch (err) {
+      this.logger.warn(`[${payload.requestId}] Instant OCR skipped for key ${payload.key}: ${err}`);
+    }
+
     await this.store.set(session);
     return {
       requestId: payload.requestId,
       status: 'id-back-uploaded',
       key: payload.key,
+      ocrResult,
     };
   }
 
@@ -86,37 +111,92 @@ export class EkycService {
   }
 
   /**
-   * Upload a file (browser → NestJS).
-   * Saves to local /tmp/ekyc-uploads/ to bypass Supabase S3 SDK auth issues.
-   * Stores a 'local:<path>' key — downloadImage handles both local and S3 keys.
+   * Upload a file (browser → NestJS → Supabase S3 or local fallback).
+   * Automatically creates an E-KYC session if `requestId` is omitted,
+   * and automatically extracts OCR if the uploaded file is an ID image.
    */
   async uploadFile(payload: {
-    requestId: string;
-    file: Express.Multer.File;
-    type: 'id-front' | 'id-back' | 'selfie';
+    requestId?: string;
+    file?: Express.Multer.File;
+    type?: 'id-front' | 'id-back' | 'selfie';
   }) {
-    const session = await this.getSession(payload.requestId);
+    if (!payload.file || !payload.file.buffer) {
+      throw new BadRequestException(
+        'Image file is required. Multipart field name must be "file".',
+      );
+    }
 
-    // Save to local temp directory
-    const uploadDir = join(tmpdir(), 'ekyc-uploads');
-    await mkdir(uploadDir, { recursive: true });
-    const filename = `${randomUUID()}-${payload.file.originalname}`;
-    const filepath = join(uploadDir, filename);
-    await writeFile(filepath, payload.file.buffer);
+    const requestId = payload.requestId || randomUUID();
+    let session = await this.store.get(requestId);
+    if (!session) {
+      session = { requestId };
+      await this.store.set(session);
+    }
 
-    // Store as 'local:<path>' key so downloadImage can read it directly
-    const key = `local:${filepath}`;
+    const uploadType = payload.type || 'id-front';
 
-    if (payload.type === 'id-front') session.idFrontKey = key;
-    else if (payload.type === 'id-back') session.idBackKey = key;
+    let key: string;
+    let s3Url: string | undefined;
+
+    if (this.s3.isConfigured()) {
+      try {
+        const s3Key = `uploads/${randomUUID()}-${payload.file.originalname}`;
+        const uploadRes = await this.s3.uploadImage(
+          s3Key,
+          payload.file.buffer,
+          payload.file.mimetype || 'image/jpeg',
+        );
+        key = uploadRes.key;
+        s3Url = uploadRes.url;
+        this.logger.log(
+          `Uploaded ${uploadType} to S3 bucket [${uploadRes.bucket}] → ${key}`,
+        );
+      } catch (s3Err) {
+        this.logger.warn(
+          `S3 upload failed (${s3Err}) — falling back to local storage`,
+        );
+        const uploadDir = join(tmpdir(), 'ekyc-uploads');
+        await mkdir(uploadDir, { recursive: true });
+        const filename = `${randomUUID()}-${payload.file.originalname}`;
+        const filepath = join(uploadDir, filename);
+        await writeFile(filepath, payload.file.buffer);
+        key = `local:${filepath}`;
+      }
+    } else {
+      // Save to local temp directory if S3 is not configured
+      const uploadDir = join(tmpdir(), 'ekyc-uploads');
+      await mkdir(uploadDir, { recursive: true });
+      const filename = `${randomUUID()}-${payload.file.originalname}`;
+      const filepath = join(uploadDir, filename);
+      await writeFile(filepath, payload.file.buffer);
+      key = `local:${filepath}`;
+      this.logger.log(`Saved ${uploadType} locally → ${filepath}`);
+    }
+
+    if (uploadType === 'id-front') session.idFrontKey = key;
+    else if (uploadType === 'id-back') session.idBackKey = key;
     else session.selfieKey = key;
 
+    let ocrResult: Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
+    if (uploadType === 'id-front' || uploadType === 'id-back') {
+      try {
+        this.logger.log(`Running instant OCR extraction on ${uploadType}...`);
+        ocrResult = await this.ocr.extractFromImage(payload.file.buffer);
+        this.logger.log(
+          `Instant OCR complete for ${uploadType} — confidence: ${ocrResult.confidence.toFixed(1)}%`,
+        );
+      } catch (err) {
+        this.logger.error(`Instant OCR failed on ${uploadType}: ${err}`);
+      }
+    }
+
     await this.store.set(session);
-    this.logger.log(`Saved ${payload.type} locally → ${filepath}`);
     return {
-      requestId: payload.requestId,
-      status: `${payload.type}-uploaded`,
+      requestId,
+      status: `${uploadType}-uploaded`,
       key,
+      url: s3Url,
+      ocrResult,
     };
   }
 

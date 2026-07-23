@@ -18,7 +18,10 @@
       <input type="file" id="image" name="image" accept="image/*" required />
       <input type="text" id="fileName" name="fileName" placeholder="File name" />
       <input type="text" id="contentType" name="contentType" placeholder="Content type" />
-      <button type="submit">Upload</button>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button type="submit">1. Presigned S3 Upload</button>
+        <button type="button" id="twoStepBtn" style="background:#10b981;color:#fff;border:none;border-radius:6px;padding:0.6rem 1rem;cursor:pointer;">2. 2-Step Backend Upload (No CORS 403)</button>
+      </div>
     </form>
 
     <h3>Preview</h3>
@@ -28,8 +31,8 @@
 
     <script>
       const apiBase = 'http://localhost:2000';
-      const presignUploadUrl = `${apiBase}/api/v1/uploads/presign-upload`;
-      const presignViewUrl = `${apiBase}/api/v1/uploads/presign-view`;
+      const presignUploadUrl = `${apiBase}/upload/presign-upload`;
+      const presignViewUrl = `${apiBase}/upload/presign-view`;
       const uploadForm = document.getElementById('uploadForm');
       const previewBtn = document.getElementById('previewBtn');
       const responseBox = document.getElementById('responseBox');
@@ -135,6 +138,40 @@
           setPreview(data.presignedUrl ?? '');
         } catch (error) {
           responseBox.textContent = 'Preview failed: ' + error;
+          setPreview('');
+        }
+      });
+
+      document.getElementById('twoStepBtn').addEventListener('click', async () => {
+        const file = document.getElementById('image').files[0];
+        if (!file) {
+          alert('Please choose an image.');
+          return;
+        }
+
+        try {
+          responseBox.textContent = 'Uploading via 2-Step Backend Proxy (NestJS → Supabase S3)...';
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const response = await fetch(`${apiBase}/upload/file`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await response.json();
+          responseBox.textContent = JSON.stringify(data, null, 2);
+
+          if (!response.ok) {
+            uploadedKey = '';
+            setPreview('');
+            return;
+          }
+
+          uploadedKey = data.key ?? '';
+          if (data.url) setPreview(data.url);
+        } catch (error) {
+          responseBox.textContent = '2-Step upload failed: ' + error;
           setPreview('');
         }
       });
