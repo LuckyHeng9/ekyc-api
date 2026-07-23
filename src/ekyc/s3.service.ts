@@ -232,6 +232,7 @@ export class S3Service {
       return `${normalizedEndpoint}/${this.bucket}/${key}`;
     }
 
-    return `http://localhost:2000/uploads/${encodeURIComponent(key)}`;
+    const appUrl = process.env.APP_URL ?? 'https://ekyc-api.onrender.com';
+    return `${appUrl.replace(/\/$/, '')}/uploads/${encodeURIComponent(key)}`;
   }
 }

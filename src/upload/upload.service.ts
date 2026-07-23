@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { S3Service } from '../ekyc/s3.service';
-import { OcrService } from '../ekyc/ocr.service';
+import { OcrService, OcrResult } from '../ekyc/ocr.service';
 
 @Injectable()
 export class UploadService {
@@ -52,7 +52,7 @@ export class UploadService {
       this.logger.log(`Saved file locally → ${filepath}`);
     }
 
-    let ocrResult;
+    let ocrResult: OcrResult | undefined;
     try {
       this.logger.log('Extracting OCR from uploaded file...');
       ocrResult = await this.ocrService.extractFromImage(file.buffer);
