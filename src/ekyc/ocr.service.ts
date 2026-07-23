@@ -131,18 +131,7 @@ export class OcrService {
     const nationality = natMatch.length === 3 ? natMatch : (line2.match(/[A-Z]{3}/)?.[0] ?? 'KHM');
 
     // Line 3: [surname]<<[given names]
-    // Tesseract misreads '<' fill chars as repeated 'L', 'K', 'I', 'X', 'Z', '4', etc.
-    const cleanLine3 = line3
-      .replace(/^[^A-Z]+/, '')
-      .replace(/[<LKIXZ4]{2,}/g, '|')
-      .replace(/[<|]+/g, '|')
-      .replace(/[^A-Z|]/gi, '')
-      .toUpperCase();
-
-    const nameParts = cleanLine3.split('|').filter((p) => p.length >= 2);
-    const surname = nameParts[0]?.trim();
-    const given = nameParts[1]?.trim();
-    const fullName = [surname, given].filter(Boolean).join(' ') || undefined;
+    const fullName = this.cleanMrzName(line3);
 
     return {
       extractedIdNumber: docNumber || undefined,
@@ -181,6 +170,45 @@ export class OcrService {
     const curYY = new Date().getFullYear() % 100;
     const year  = yy <= curYY + 10 ? 2000 + yy : 1900 + yy;
     return `${year}-${mm}-${dd}`;
+  }
+
+  private cleanMrzName(line3: string): string | undefined {
+    // 1. Strip leading non-alpha noise and trailing chevrons/spaces ONLY (never strip letters like L at word end)
+    let raw = line3.toUpperCase().replace(/^[^A-Z]+/, '').replace(/[<\s]+$/, '');
+
+    const parts = raw.split(/<{2,}/).map((p) => p.trim()).filter(Boolean);
+    if (!parts.length) return undefined;
+
+    const surname = parts[0].replace(/[^A-Z]/g, '');
+
+    let rawGiven = parts[1] ?? '';
+    // Strip leading misread single filler char if Tesseract read '<<K' as part of given name
+    rawGiven = rawGiven.replace(/^[KLIXZ4](?=[A-Z]{2,})/, '');
+
+    const givenWords = rawGiven
+      .split('<')
+      .map((w) => w.replace(/[^A-Z]/g, ''))
+      .filter(Boolean);
+
+    const validGivenWords: string[] = [];
+    for (let w of givenWords) {
+      if (!w) continue;
+      // Collapse 3+ character repetitions (e.g. LLLLLLLLL -> L)
+      w = w.replace(/([A-Z])\1{2,}/g, '$1');
+      // Strip trailing single noise characters like KL at word end if added by OCR fill
+      w = w.replace(/(?<=[A-Z]{3,})[KLIXZ4]{1,2}$/, '');
+
+      // If a single letter (like 'L') follows a word of length >= 3, merge it back (e.g. SOPHOR + L -> SOPHORL)
+      const lastIdx = validGivenWords.length - 1;
+      if (w.length === 1 && lastIdx >= 0 && validGivenWords[lastIdx].length >= 3) {
+        validGivenWords[lastIdx] += w;
+      } else {
+        validGivenWords.push(w);
+      }
+    }
+
+    const given = validGivenWords.join(' ');
+    return [surname, given].filter(Boolean).join(' ') || undefined;
   }
 
   // ── Free-text fallbacks ────────────────────────────────────────────────────
