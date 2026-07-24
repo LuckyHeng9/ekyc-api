@@ -21,6 +21,10 @@ interface LuxandSearchResult {
   matches?: LuxandMatch[];
 }
 
+interface LuxandErrorResponse {
+  message?: string;
+}
+
 /**
  * Face verification using Luxand.cloud Face API
  *
@@ -59,7 +63,9 @@ export class CompreFaceService {
   ): Promise<FaceMatchResult> {
     if (!this.token) {
       if (process.env.ALLOW_MOCK_FACEMATCH === 'true') {
-        this.logger.warn('Luxand token not set — using MOCK face match (ALLOW_MOCK_FACEMATCH=true)');
+        this.logger.warn(
+          'Luxand token not set — using MOCK face match (ALLOW_MOCK_FACEMATCH=true)',
+        );
         return {
           matched: true,
           similarity: 0.95,
@@ -155,8 +161,8 @@ export class CompreFaceService {
       const errText = await res.text();
       let errorMsg = `Luxand Face API HTTP ${res.status}`;
       try {
-        const errJson = JSON.parse(errText);
-        if (errJson.message) {
+        const errJson = JSON.parse(errText) as LuxandErrorResponse;
+        if (typeof errJson?.message === 'string') {
           errorMsg = `Face API Error: ${errJson.message}`;
         }
       } catch {
@@ -225,7 +231,9 @@ export class CompreFaceService {
 
     // Find match for our stored uuid
 
-    const match = results[0]?.matches?.find((m: LuxandMatch) => m.uuid === uuid);
+    const match = results[0]?.matches?.find(
+      (m: LuxandMatch) => m.uuid === uuid,
+    );
     const similarity: number =
       match?.similarity ?? results[0]?.matches?.[0]?.similarity ?? 0;
     const matched = similarity >= this.threshold;

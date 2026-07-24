@@ -1,4 +1,10 @@
-import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
@@ -62,7 +68,8 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: '2-Step Backend Upload: Upload file via NestJS → Supabase S3 + OCR (bypasses browser 403 CORS)',
+    summary:
+      '2-Step Backend Upload: Upload file via NestJS → Supabase S3 + OCR (bypasses browser 403 CORS)',
   })
   @ApiBody({
     schema: {

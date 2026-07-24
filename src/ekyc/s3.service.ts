@@ -11,7 +11,9 @@ import { randomUUID } from 'node:crypto';
 @Injectable()
 export class S3Service {
   private get bucket(): string {
-    return process.env.S3_BUCKET ?? process.env.AWS_S3_BUCKET ?? 'documents-ekyc';
+    return (
+      process.env.S3_BUCKET ?? process.env.AWS_S3_BUCKET ?? 'documents-ekyc'
+    );
   }
 
   private get client(): S3Client | null {
@@ -19,9 +21,7 @@ export class S3Service {
     if (!endpoint) return null;
 
     const accessKeyId =
-      process.env.S3_ACCESS_KEY_ID ??
-      process.env.AWS_ACCESS_KEY_ID ??
-      '';
+      process.env.S3_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID ?? '';
     const secretAccessKey =
       process.env.S3_SECRET_ACCESS_KEY ??
       process.env.AWS_SECRET_ACCESS_KEY ??
@@ -74,7 +74,9 @@ export class S3Service {
   async uploadToFirebase(key: string, buffer: Buffer, contentType: string) {
     const bucket = process.env.FIREBASE_STORAGE_BUCKET;
     if (!bucket) {
-      throw new BadRequestException('FIREBASE_STORAGE_BUCKET is not set in .env');
+      throw new BadRequestException(
+        'FIREBASE_STORAGE_BUCKET is not set in .env',
+      );
     }
 
     const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket)}/o?uploadType=media&name=${encodeURIComponent(key)}`;
@@ -88,7 +90,9 @@ export class S3Service {
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`Firebase Storage upload failed (${res.status}): ${errText}`);
+      throw new Error(
+        `Firebase Storage upload failed (${res.status}): ${errText}`,
+      );
     }
 
     const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(key)}?alt=media`;
@@ -110,7 +114,9 @@ export class S3Service {
         ContentType: contentType,
       });
       await this.client.send(command);
-      this.logger.log(`Successfully uploaded to Supabase S3 bucket [${this.bucket}] → ${key}`);
+      this.logger.log(
+        `Successfully uploaded to Supabase S3 bucket [${this.bucket}] → ${key}`,
+      );
       return {
         key,
         bucket: this.bucket,
@@ -190,9 +196,17 @@ export class S3Service {
 
     if (
       response.Body &&
-      typeof (response.Body as unknown as { transformToByteArray?: () => Promise<Uint8Array> }).transformToByteArray === 'function'
+      typeof (
+        response.Body as unknown as {
+          transformToByteArray?: () => Promise<Uint8Array>;
+        }
+      ).transformToByteArray === 'function'
     ) {
-      const byteArray = await (response.Body as unknown as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+      const byteArray = await (
+        response.Body as unknown as {
+          transformToByteArray: () => Promise<Uint8Array>;
+        }
+      ).transformToByteArray();
       return Buffer.from(byteArray);
     }
 

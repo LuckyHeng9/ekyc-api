@@ -56,16 +56,21 @@ export class EkycService {
     const session = await this.getSession(payload.requestId);
     session.idFrontKey = payload.key;
 
-    let ocrResult: Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
+    let ocrResult:
+      Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
     try {
-      this.logger.log(`[${payload.requestId}] Extracting OCR from ID front key: ${payload.key}...`);
+      this.logger.log(
+        `[${payload.requestId}] Extracting OCR from ID front key: ${payload.key}...`,
+      );
       const idBuffer = await this.s3.downloadImage(payload.key);
       ocrResult = await this.ocr.extractFromImage(idBuffer);
       this.logger.log(
         `[${payload.requestId}] Instant OCR done — confidence: ${ocrResult.confidence.toFixed(1)}%`,
       );
     } catch (err) {
-      this.logger.warn(`[${payload.requestId}] Instant OCR skipped for key ${payload.key}: ${err}`);
+      this.logger.warn(
+        `[${payload.requestId}] Instant OCR skipped for key ${payload.key}: ${err}`,
+      );
     }
 
     await this.store.set(session);
@@ -81,13 +86,18 @@ export class EkycService {
     const session = await this.getSession(payload.requestId);
     session.idBackKey = payload.key;
 
-    let ocrResult: Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
+    let ocrResult:
+      Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
     try {
-      this.logger.log(`[${payload.requestId}] Extracting OCR from ID back key: ${payload.key}...`);
+      this.logger.log(
+        `[${payload.requestId}] Extracting OCR from ID back key: ${payload.key}...`,
+      );
       const idBuffer = await this.s3.downloadImage(payload.key);
       ocrResult = await this.ocr.extractFromImage(idBuffer);
     } catch (err) {
-      this.logger.warn(`[${payload.requestId}] Instant OCR skipped for key ${payload.key}: ${err}`);
+      this.logger.warn(
+        `[${payload.requestId}] Instant OCR skipped for key ${payload.key}: ${err}`,
+      );
     }
 
     await this.store.set(session);
@@ -177,7 +187,8 @@ export class EkycService {
     else if (uploadType === 'id-back') session.idBackKey = key;
     else session.selfieKey = key;
 
-    let ocrResult: Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
+    let ocrResult:
+      Awaited<ReturnType<typeof this.ocr.extractFromImage>> | undefined;
     if (uploadType === 'id-front' || uploadType === 'id-back') {
       try {
         this.logger.log(`Running instant OCR extraction on ${uploadType}...`);

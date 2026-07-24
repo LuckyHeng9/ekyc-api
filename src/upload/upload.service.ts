@@ -40,7 +40,9 @@ export class UploadService {
       );
       key = uploadRes.key;
       s3Url = uploadRes.url;
-      this.logger.log(`Uploaded file to S3 bucket [${uploadRes.bucket}] → ${key}`);
+      this.logger.log(
+        `Uploaded file to S3 bucket [${uploadRes.bucket}] → ${key}`,
+      );
     } else {
       const uploadDir = join(tmpdir(), 'ekyc-uploads');
       await mkdir(uploadDir, { recursive: true });
