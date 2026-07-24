@@ -58,6 +58,15 @@ export class CompreFaceService {
     targetBuffer: Buffer,
   ): Promise<FaceMatchResult> {
     if (!this.token) {
+      if (process.env.ALLOW_MOCK_FACEMATCH === 'true') {
+        this.logger.warn('Luxand token not set — using MOCK face match (ALLOW_MOCK_FACEMATCH=true)');
+        return {
+          matched: true,
+          similarity: 0.95,
+          confidence: 95,
+          message: 'Face match successful (Mock Mode)',
+        };
+      }
       this.logger.warn('Luxand token not set — check LUXAND_TOKEN in .env');
       return {
         matched: false,
@@ -69,13 +78,34 @@ export class CompreFaceService {
 
     try {
       // Step 1: Detect + store face from ID card → get uuid
-      const idUuid = await this.storeFace(targetBuffer, 'ID card');
+      const storeRes = await this.storeFace(targetBuffer, 'ID card');
+      if (storeRes.error) {
+        if (process.env.ALLOW_MOCK_FACEMATCH === 'true') {
+          this.logger.warn(
+            `Luxand API error (${storeRes.error}) — falling back to MOCK face match`,
+          );
+          return {
+            matched: true,
+            similarity: 0.92,
+            confidence: 92,
+            message: 'Face match successful (Mock Fallback)',
+          };
+        }
+        return {
+          matched: false,
+          similarity: 0,
+          confidence: 0,
+          message: storeRes.error,
+        };
+      }
+
+      const idUuid = storeRes.uuid;
       if (!idUuid) {
         return {
           matched: false,
           similarity: 0,
           confidence: 0,
-          message: 'No face detected in ID card',
+          message: 'No face detected in ID card photo',
         };
       }
 
@@ -92,19 +122,19 @@ export class CompreFaceService {
         matched: false,
         similarity: 0,
         confidence: 0,
-        message: 'Face comparison failed',
+        message: 'Face comparison failed due to API error',
       };
     }
   }
 
   /**
    * Upload a face photo to Luxand temporary subject store.
-   * Returns the Luxand uuid for the stored face.
+   * Returns the Luxand uuid for the stored face, or error message.
    */
   private async storeFace(
     buffer: Buffer,
     label: string,
-  ): Promise<string | null> {
+  ): Promise<{ uuid: string | null; error?: string }> {
     const form = new FormData();
     form.append('photo', buffer, {
       filename: 'face.jpg',
@@ -122,11 +152,20 @@ export class CompreFaceService {
     });
 
     if (!res.ok) {
-      const err = await res.text();
+      const errText = await res.text();
+      let errorMsg = `Luxand Face API HTTP ${res.status}`;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.message) {
+          errorMsg = `Face API Error: ${errJson.message}`;
+        }
+      } catch {
+        // use raw text if not json
+      }
       this.logger.error(
-        `Luxand store face failed for ${label} (${res.status}): ${err}`,
+        `Luxand store face failed for ${label} (${res.status}): ${errText}`,
       );
-      return null;
+      return { uuid: null, error: errorMsg };
     }
 
     const json = (await res.json()) as LuxandSubjectResponse;
@@ -134,11 +173,11 @@ export class CompreFaceService {
 
     if (!uuid) {
       this.logger.warn(`No face detected in ${label} by Luxand`);
-      return null;
+      return { uuid: null };
     }
 
     this.logger.log(`Luxand: stored ${label} face → uuid=${uuid}`);
-    return uuid;
+    return { uuid };
   }
 
   /**
