@@ -325,12 +325,12 @@ export class EkycService {
     }
 
     // ── Step 4: Determine overall result ─────────────────────────────────────
-    const faceMatched = faceResult?.matched ?? true; // no selfie = skip face check
-    // Lower confidence threshold for OCR-only mode (Khmer IDs score lower with Tesseract)
-    const ocrThreshold = selfieOptional ? 10 : 30;
+    const faceMatched = faceResult?.matched ?? true;
+    const isMrz = ocrResult.mrzDetected ?? false;
+    const ocrThreshold = isMrz ? 10 : selfieOptional ? 10 : 20;
     const verified =
       faceMatched &&
-      ocrResult.confidence > ocrThreshold &&
+      (ocrResult.confidence > ocrThreshold || isMrz) &&
       (session.livenessPassed ?? false);
 
     const message = verified

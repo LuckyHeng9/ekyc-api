@@ -3,104 +3,127 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>E-KYC Test Console</title>
+<title>E-KYC Face Match & Verification Console</title>
 <style>
   :root{--bg:#0d0f14;--card:#161b27;--border:#2a3045;--accent:#6c63ff;--accent2:#00d4aa;--danger:#ff4d6d;--text:#e2e8f0;--muted:#64748b;--success:#22c55e;}
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;padding:24px;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,sans-serif;min-height:100vh;padding:24px;}
   h1{text-align:center;font-size:1.8rem;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;}
-  .sub{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:32px;}
-  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px;max-width:1100px;margin:0 auto;}
-  .steps{display:flex;flex-direction:column;gap:12px;}
-  .step{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;transition:.3s;}
-  .step.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)22;}
-  .step.done{border-color:var(--success)55;}
+  .sub{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:24px;}
+  .grid{display:grid;grid-template-columns:1fr 380px;gap:20px;max-width:1150px;margin:0 auto;}
+  .steps{display:flex;flex-direction:column;gap:14px;}
+  .step{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;transition:.3s;}
+  .step.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(108,99,255,0.2);}
+  .step.done{border-color:rgba(34,197,94,0.4);}
   .step-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-  .badge{width:28px;height:28px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;}
-  .step.active .badge{background:var(--accent);}
-  .step.done .badge{background:var(--success);}
+  .badge{width:28px;height:28px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0;}
+  .step.active .badge{background:var(--accent);color:#fff;}
+  .step.done .badge{background:var(--success);color:#fff;}
   .step-title{font-weight:600;font-size:.95rem;}
-  label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:4px;margin-top:10px;}
-  input,select{width:100%;background:#1e2535;border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:.85rem;outline:none;}
+  label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:6px;margin-top:10px;}
+  input,select{width:100%;background:#1e2535;border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:.85rem;outline:none;}
   input:focus{border-color:var(--accent);}
   input[type=file]{padding:6px;}
-  btn,button{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:600;cursor:pointer;transition:.2s;width:100%;justify-content:center;margin-top:10px;}
-  button:hover{opacity:.85;}
-  button:disabled{opacity:.4;cursor:not-allowed;}
-  button.secondary{background:var(--border);}
+  button,.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:.85rem;font-weight:600;cursor:pointer;transition:.2s;width:100%;justify-content:center;margin-top:10px;}
+  button:hover{opacity:.9;transform:translateY(-1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  button.secondary{background:var(--border);color:var(--text);}
+  button.accent2{background:var(--accent2);color:#0d0f14;}
   button.danger{background:var(--danger);}
+  
+  .preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
+  .preview-card{background:#0a0c12;border:1px dashed var(--border);border-radius:10px;padding:12px;text-align:center;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .preview-card img{max-width:100%;max-height:140px;border-radius:6px;object-fit:contain;margin-top:8px;}
+  
+  .webcam-box{width:100%;max-width:320px;border-radius:8px;overflow:hidden;background:#000;margin:10px auto;display:none;}
+  video{width:100%;height:auto;transform:scaleX(-1);}
+  
   .log-panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column;height:fit-content;position:sticky;top:24px;}
   .log-title{font-weight:700;font-size:.95rem;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
-  .log-body{background:#0a0c12;border-radius:8px;padding:14px;font-family:'Fira Code',monospace;font-size:.75rem;max-height:600px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
-  .log-entry{padding:8px 10px;border-radius:6px;border-left:3px solid var(--border);}
+  .log-body{background:#0a0c12;border-radius:8px;padding:14px;font-family:'Fira Code',Consolas,monospace;font-size:.75rem;max-height:550px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+  .log-entry{padding:8px 10px;border-radius:6px;border-left:3px solid var(--border);word-break:break-word;}
   .log-entry.ok{border-color:var(--success);background:#16322244;}
   .log-entry.err{border-color:var(--danger);background:#2d101844;}
   .log-entry.info{border-color:var(--accent);background:#1e1b3344;}
-  .log-time{color:var(--muted);font-size:.7rem;}
-  .result-box{margin-top:10px;background:#0a0c12;border-radius:8px;padding:12px;font-family:monospace;font-size:.76rem;white-space:pre-wrap;max-height:160px;overflow-y:auto;border:1px solid var(--border);}
-  .chip{display:inline-block;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:600;}
-  .chip.ok{background:#16322299;color:var(--success);}
-  .chip.fail{background:#2d101899;color:var(--danger);}
-  .liveness-action{text-align:center;padding:20px;background:#1e1b33;border-radius:10px;margin-top:10px;}
-  .liveness-emoji{font-size:3rem;margin-bottom:8px;}
-  .liveness-text{font-size:1.1rem;font-weight:700;color:var(--accent2);}
-  .progress-bar{height:3px;background:var(--border);border-radius:2px;margin:20px 0 0;overflow:hidden;}
-  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s;}
-  .conf-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px;}
-  .conf-fill{height:100%;border-radius:4px;transition:width .6s;}
+  .log-time{color:var(--muted);font-size:.7rem;margin-bottom:2px;}
+  .result-box{margin-top:12px;background:#0a0c12;border-radius:8px;padding:14px;font-family:monospace;font-size:.78rem;white-space:pre-wrap;max-height:220px;overflow-y:auto;border:1px solid var(--border);}
+  .chip{display:inline-block;padding:3px 10px;border-radius:100px;font-size:.75rem;font-weight:600;}
+  .chip.ok{background:#16322299;color:var(--success);border:1px solid var(--success);}
+  .chip.fail{background:#2d101899;color:var(--danger);border:1px solid var(--danger);}
+  
+  .liveness-action{text-align:center;padding:16px;background:#1e1b33;border-radius:10px;margin-top:10px;}
+  .liveness-emoji{font-size:2.5rem;margin-bottom:4px;}
+  .liveness-text{font-size:1rem;font-weight:700;color:var(--accent2);}
+  .conf-bar{height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-top:6px;}
+  .conf-fill{height:100%;border-radius:5px;transition:width .6s;}
 </style>
 </head>
 <body>
-<h1>🔐 E-KYC Test Console</h1>
-<p class="sub">Full identity verification flow — Auth → Upload → Liveness → Verify</p>
+<h1>🔐 E-KYC Face Match & Verification Console</h1>
+<p class="sub">Upload ID photo + Selfie photo $\rightarrow$ Compare face match & extract document OCR</p>
 
-<div style="max-width:1100px;margin:0 auto 16px;display:flex;gap:10px;align-items:center;">
+<div style="max-width:1150px;margin:0 auto 16px;display:flex;gap:10px;align-items:center;">
   <label style="margin:0;white-space:nowrap;color:var(--muted);font-size:.8rem;">API Base URL:</label>
-  <input id="apiBase" value="https://ekyc-api.onrender.com" style="max-width:320px;"/>
+  <input id="apiBase" value="http://localhost:2000" style="max-width:320px;"/>
   <span id="statusDot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;"></span>
 </div>
 
 <div class="grid">
   <div class="steps">
 
-    <!-- Step 1: Start -->
+    <!-- Step 1: Start Session -->
     <div class="step active" id="s1">
-      <div class="step-header"><div class="badge">1</div><span class="step-title">Start Session</span></div>
-      <button onclick="doStart()" id="btnStart">Start E-KYC Session</button>
-      <div id="startResult"></div>
+      <div class="step-header"><div class="badge">1</div><span class="step-title">Start E-KYC Session</span></div>
+      <button onclick="doStart()" id="btnStart">🚀 Initialize Session</button>
+      <div id="startResult" style="margin-top:8px;"></div>
     </div>
 
-    <!-- Step 2: ID Front -->
+    <!-- Step 2: Upload ID Photo & Selfie -->
     <div class="step" id="s2">
-      <div class="step-header"><div class="badge">2</div><span class="step-title">Upload ID Front</span></div>
-      <label>Select ID card photo</label>
-      <input type="file" id="idFile" accept="image/*"/>
-      <button onclick="doUpload('id-front','idFile')" id="btnId" disabled>Upload ID Front</button>
-      <div id="idResult"></div>
+      <div class="step-header"><div class="badge">2</div><span class="step-title">Upload ID Card & Selfie Photos</span></div>
+      
+      <div class="preview-grid">
+        <!-- ID Card Card -->
+        <div class="preview-card">
+          <strong style="font-size:.85rem;color:var(--accent2);">💳 ID Card Photo</strong>
+          <input type="file" id="idFile" accept="image/*" onchange="previewImage(this, 'idPreview')" style="margin-top:8px;"/>
+          <img id="idPreview" style="display:none;"/>
+          <button onclick="doUploadDirect('id-front', 'idFile')" id="btnIdUpload" disabled style="font-size:.78rem;padding:6px 10px;">Upload ID Front</button>
+          <div id="idResult" style="margin-top:6px;"></div>
+        </div>
+
+        <!-- Selfie Photo Card -->
+        <div class="preview-card">
+          <strong style="font-size:.85rem;color:var(--accent);">🤳 Selfie Photo</strong>
+          <input type="file" id="selfieFile" accept="image/*" onchange="previewImage(this, 'selfiePreview')" style="margin-top:8px;"/>
+          
+          <button onclick="toggleWebcam()" class="secondary" style="font-size:.75rem;padding:4px 8px;margin-top:6px;">📷 Use Live Camera</button>
+          
+          <div class="webcam-box" id="webcamBox">
+            <video id="webcamVideo" autoplay playsinline></video>
+            <button onclick="captureWebcam()" class="accent2" style="font-size:.75rem;padding:4px 8px;margin:4px auto;">Snap Selfie</button>
+          </div>
+
+          <img id="selfiePreview" style="display:none;"/>
+          <button onclick="doUploadDirect('selfie', 'selfieFile')" id="btnSelfieUpload" disabled style="font-size:.78rem;padding:6px 10px;">Upload Selfie</button>
+          <div id="selfieResult" style="margin-top:6px;"></div>
+        </div>
+      </div>
     </div>
 
-    <!-- Step 3: Selfie -->
+    <!-- Step 3: Liveness Check -->
     <div class="step" id="s3">
-      <div class="step-header"><div class="badge">3</div><span class="step-title">Upload Selfie</span></div>
-      <label>Select selfie photo</label>
-      <input type="file" id="selfieFile" accept="image/*"/>
-      <button onclick="doUpload('selfie','selfieFile')" id="btnSelfie" disabled>Upload Selfie</button>
-      <div id="selfieResult"></div>
-    </div>
-
-    <!-- Step 4: Liveness -->
-    <div class="step" id="s4">
-      <div class="step-header"><div class="badge">4</div><span class="step-title">Liveness Check</span></div>
-      <button onclick="doLivenessRequest()" id="btnLiveness" disabled>Request Challenge</button>
+      <div class="step-header"><div class="badge">3</div><span class="step-title">Liveness Verification</span></div>
+      <button onclick="doLivenessRequest()" id="btnLiveness" disabled>Request Random Challenge</button>
       <div id="livenessChallenge"></div>
-      <button onclick="doLivenessConfirm()" id="btnLivenessConfirm" disabled style="display:none;background:var(--accent2);color:#000;">✅ I Did It — Confirm</button>
-      <div id="livenessResult"></div>
+      <button onclick="doLivenessConfirm()" id="btnLivenessConfirm" disabled style="display:none;background:var(--accent2);color:#0d0f14;margin-top:8px;">✅ Confirm Action</button>
+      <div id="livenessResult" style="margin-top:6px;"></div>
     </div>
 
-    <!-- Step 5: Verify -->
-    <div class="step" id="s5">
-      <div class="step-header"><div class="badge">5</div><span class="step-title">Verify Identity</span></div>
-      <button onclick="doVerify()" id="btnVerify" disabled>🚀 Run Verification</button>
+    <!-- Step 4: Run Verification & Face Match -->
+    <div class="step" id="s4">
+      <div class="step-header"><div class="badge">4</div><span class="step-title">Compare Face Match & OCR Result</span></div>
+      <button onclick="doVerify()" id="btnVerify" disabled class="accent2" style="font-size:1rem;padding:12px;">🔍 Compare Faces & Extract Data</button>
       <div id="verifyResult"></div>
     </div>
 
@@ -109,17 +132,22 @@
   <!-- Log Panel -->
   <div class="log-panel">
     <div class="log-title">
-      <span>📋 API Log</span>
+      <span>📋 System Logs</span>
       <button class="secondary" style="width:auto;margin:0;padding:4px 10px;font-size:.75rem;" onclick="clearLog()">Clear</button>
     </div>
     <div class="log-body" id="logBody"></div>
-    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   </div>
 </div>
 
 <script>
-let token = '', requestId = '', challengeId = '', challengeAction = '';
-let stepProgress = 0;
+let requestId = '', challengeId = '', challengeAction = '';
+let webcamStream = null;
+let selfieBlob = null;
+
+// Set default API base URL to local server
+if (!document.getElementById('apiBase').value || window.location.protocol === 'file:') {
+  document.getElementById('apiBase').value = 'http://localhost:2000';
+}
 
 function base(){ return document.getElementById('apiBase').value.replace(/\/$/,''); }
 
@@ -129,75 +157,119 @@ function log(msg, type='info', data=null){
   const div = document.createElement('div');
   div.className = `log-entry ${type}`;
   div.innerHTML = `<div class="log-time">${t}</div><div>${msg}</div>`
-    + (data ? `<div style="color:#94a3b8;margin-top:4px;word-break:break-all">${JSON.stringify(data,null,2)}</div>` : '');
+    + (data ? `<div style="color:#94a3b8;margin-top:4px;white-space:pre-wrap;">${JSON.stringify(data,null,2)}</div>` : '');
   b.appendChild(div);
   b.scrollTop = b.scrollHeight;
 }
 
 function clearLog(){ document.getElementById('logBody').innerHTML=''; }
 
-function setProgress(p){
-  stepProgress = p;
-  document.getElementById('progressFill').style.width = (p/6*100)+'%';
+function previewImage(input, imgId){
+  const file = input.files[0];
+  if(file){
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById(imgId);
+      img.src = e.target.result;
+      img.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
 }
 
-async function api(method, path, body=null, isBlob=false){
-  const opts = { method, headers:{ Authorization:`Bearer ${token}` } };
-  if(body instanceof FormData){ opts.body = body; }
-  else if(body){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
-  const r = await fetch(base()+path, opts);
-  if(isBlob) return r;
-  const json = await r.json().catch(()=>({error:'non-JSON response'}));
-  if(!r.ok) throw Object.assign(new Error(json?.message||'API error'), {data:json, status:r.status});
-  return json;
+async function toggleWebcam(){
+  const box = document.getElementById('webcamBox');
+  const video = document.getElementById('webcamVideo');
+  if(webcamStream){
+    webcamStream.getTracks().forEach(t => t.stop());
+    webcamStream = null;
+    box.style.display = 'none';
+    return;
+  }
+  try{
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    video.srcObject = webcamStream;
+    box.style.display = 'block';
+  }catch(e){
+    log('Webcam access error: '+e.message, 'err');
+  }
+}
+
+function captureWebcam(){
+  const video = document.getElementById('webcamVideo');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  canvas.toBlob(blob => {
+    selfieBlob = blob;
+    const img = document.getElementById('selfiePreview');
+    img.src = URL.createObjectURL(blob);
+    img.style.display = 'block';
+    toggleWebcam();
+    log('Captured selfie from camera ✅', 'ok');
+  }, 'image/jpeg', 0.9);
 }
 
 async function doStart(){
   log('POST /ekyc/start');
   try{
-    const r = await api('POST','/ekyc/start');
+    const r = await fetch(base()+'/ekyc/start', { method:'POST' }).then(res=>res.json());
     requestId = r.requestId;
-    log('Session started ✅','ok',{requestId});
-    document.getElementById('startResult').innerHTML=`<span class="chip ok">✓ ${requestId.slice(0,18)}…</span>`;
+    log('Session started ✅', 'ok', { requestId });
+    document.getElementById('startResult').innerHTML = `<span class="chip ok">✓ Session ID: ${requestId.slice(0,18)}…</span>`;
     document.getElementById('s1').classList.add('done');
     document.getElementById('s2').classList.add('active');
-    document.getElementById('btnId').disabled=false;
-    setProgress(2);
-  }catch(e){ log('Start failed: '+e.message,'err',e.data); }
+    document.getElementById('btnIdUpload').disabled = false;
+    document.getElementById('btnSelfieUpload').disabled = false;
+  }catch(e){
+    log('Start failed: '+e.message, 'err');
+  }
 }
 
-async function doUpload(type, fileInputId){
-  const file = document.getElementById(fileInputId).files[0];
-  if(!file){ log('Select a file first','err'); return; }
-  log(`POST /upload/presign-upload → ${file.name}`);
+async function doUploadDirect(type, fileInputId){
+  const fileInput = document.getElementById(fileInputId);
+  let fileToUpload = fileInput.files[0];
+  if(type === 'selfie' && selfieBlob && !fileToUpload){
+    fileToUpload = new File([selfieBlob], 'webcam-selfie.jpg', { type: 'image/jpeg' });
+  }
+  if(!fileToUpload){
+    log(`Select or capture a ${type} image first`, 'err');
+    return;
+  }
+
+  log(`Uploading ${type} directly to /ekyc/upload-file...`);
+  const formData = new FormData();
+  formData.append('file', fileToUpload);
+  formData.append('requestId', requestId);
+  formData.append('type', type);
+
   try{
-    // 1. Get presign
-    const presign = await api('POST','/upload/presign-upload',{filename:file.name,contentType:file.type});
-    const uploadUrl = presign.presignedUrl || presign.url || presign.uploadUrl || presign.data?.presignedUrl;
-    const key = presign.key || presign.data?.key;
-    log('Got presigned URL','info',{key});
-    // 2. Upload to S3
-    const s3res = await fetch(uploadUrl,{method:'PUT',headers:{'Content-Type':file.type},body:file});
-    if(!s3res.ok) throw new Error('S3 upload failed: '+s3res.status);
-    log('Uploaded to S3 ✅','ok');
-    // 3. Store key
-    const path = type==='selfie' ? '/ekyc/upload-selfie' : '/ekyc/upload-id-front';
-    await api('POST',path,{requestId,key});
-    log(`Stored ${type} key ✅`,'ok',{key});
-    if(type==='id-front'){
-      document.getElementById('idResult').innerHTML='<span class="chip ok">✓ ID uploaded</span>';
-      document.getElementById('s2').classList.add('done');
-      document.getElementById('s3').classList.add('active');
-      document.getElementById('btnSelfie').disabled=false;
-      setProgress(3);
+    const res = await fetch(base()+'/ekyc/upload-file', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.message || 'Upload failed');
+    log(`${type} uploaded successfully ✅`, 'ok', data);
+
+    if(type === 'id-front'){
+      document.getElementById('idResult').innerHTML = '<span class="chip ok">✓ ID Uploaded</span>';
     } else {
-      document.getElementById('selfieResult').innerHTML='<span class="chip ok">✓ Selfie uploaded</span>';
-      document.getElementById('s3').classList.add('done');
-      document.getElementById('s4').classList.add('active');
-      document.getElementById('btnLiveness').disabled=false;
-      setProgress(4);
+      document.getElementById('selfieResult').innerHTML = '<span class="chip ok">✓ Selfie Uploaded</span>';
     }
-  }catch(e){ log('Upload failed: '+e.message,'err',e.data||e); }
+
+    // Enable next step if both uploaded or selfie uploaded
+    document.getElementById('s2').classList.add('done');
+    document.getElementById('s3').classList.add('active');
+    document.getElementById('btnLiveness').disabled = false;
+  }catch(e){
+    log(`${type} upload failed: ${e.message}`, 'err');
+  }
 }
 
 const livenessEmoji = {blink:'😉',smile:'😄',turn_left:'👈',turn_right:'👉',nod:'🙂'};
@@ -206,68 +278,107 @@ const livenessLabel = {blink:'Blink both eyes',smile:'Smile at the camera',turn_
 async function doLivenessRequest(){
   log('POST /ekyc/liveness/request');
   try{
-    const r = await api('POST','/ekyc/liveness/request',{requestId});
+    const res = await fetch(base()+'/ekyc/liveness/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId })
+    });
+    const r = await res.json();
+    if(!res.ok) throw new Error(r.message);
     challengeId = r.challengeId;
     challengeAction = r.action;
-    log('Liveness challenge issued','info',{action:challengeAction,expiresIn:r.expiresIn});
-    document.getElementById('livenessChallenge').innerHTML=`
+    log('Liveness challenge issued', 'info', { action: challengeAction, expiresIn: r.expiresIn });
+    document.getElementById('livenessChallenge').innerHTML = `
       <div class="liveness-action">
         <div class="liveness-emoji">${livenessEmoji[challengeAction]||'🤔'}</div>
         <div class="liveness-text">${livenessLabel[challengeAction]||challengeAction}</div>
         <div style="color:var(--muted);font-size:.78rem;margin-top:6px;">Expires in ${r.expiresIn}s</div>
       </div>`;
-    document.getElementById('btnLivenessConfirm').style.display='flex';
-    document.getElementById('btnLivenessConfirm').disabled=false;
-  }catch(e){ log('Liveness request failed: '+e.message,'err',e.data); }
+    document.getElementById('btnLivenessConfirm').style.display = 'inline-flex';
+    document.getElementById('btnLivenessConfirm').disabled = false;
+  }catch(e){ log('Liveness request failed: '+e.message, 'err'); }
 }
 
 async function doLivenessConfirm(){
   log(`POST /ekyc/liveness/confirm → action=${challengeAction}`);
   try{
-    const r = await api('POST','/ekyc/liveness/confirm',{requestId,challengeId,action:challengeAction});
-    log('Liveness passed ✅','ok',r);
-    document.getElementById('livenessResult').innerHTML='<span class="chip ok">✓ Liveness passed</span>';
-    document.getElementById('s4').classList.add('done');
-    document.getElementById('s5').classList.add('active');
-    document.getElementById('btnVerify').disabled=false;
-    document.getElementById('btnLivenessConfirm').style.display='none';
-    setProgress(5);
-  }catch(e){ log('Liveness confirm failed: '+e.message,'err',e.data); }
+    const res = await fetch(base()+'/ekyc/liveness/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, challengeId, action: challengeAction })
+    });
+    const r = await res.json();
+    if(!res.ok) throw new Error(r.message);
+    log('Liveness passed ✅', 'ok', r);
+    document.getElementById('livenessResult').innerHTML = '<span class="chip ok">✓ Liveness Passed</span>';
+    document.getElementById('s3').classList.add('done');
+    document.getElementById('s4').classList.add('active');
+    document.getElementById('btnVerify').disabled = false;
+    document.getElementById('btnLivenessConfirm').style.display = 'none';
+  }catch(e){ log('Liveness confirm failed: '+e.message, 'err'); }
 }
 
 async function doVerify(){
-  log('POST /ekyc/verify ⏳ (this may take a few seconds)','info');
-  document.getElementById('btnVerify').disabled=true;
-  document.getElementById('btnVerify').textContent='⏳ Verifying…';
+  log('POST /ekyc/verify ⏳ Comparing faces and extracting OCR...', 'info');
+  document.getElementById('btnVerify').disabled = true;
+  document.getElementById('btnVerify').textContent = '⏳ Comparing Faces…';
   try{
-    const r = await api('POST','/ekyc/verify',{requestId});
+    const res = await fetch(base()+'/ekyc/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId })
+    });
+    const r = await res.json();
     const ok = r.verified;
-    log(ok?'✅ VERIFICATION PASSED':'❌ VERIFICATION FAILED', ok?'ok':'err', r);
-    setProgress(6);
-    document.getElementById('s5').classList.add('done');
-    document.getElementById('verifyResult').innerHTML=`
-      <div style="margin-top:10px;">
-        <div style="font-size:1.2rem;font-weight:700;color:${ok?'var(--success)':'var(--danger)'};margin-bottom:8px;">
-          ${ok?'✅ Verified':'❌ Not Verified'}
+    log(ok ? '✅ VERIFICATION PASSED' : '❌ VERIFICATION FAILED', ok ? 'ok' : 'err', r);
+    document.getElementById('s4').classList.add('done');
+    
+    const faceScore = r.faceMatchConfidence !== null ? r.faceMatchConfidence : 0;
+    const isGoodMatch = faceScore >= 70;
+
+    document.getElementById('verifyResult').innerHTML = `
+      <div style="margin-top:14px;background:#161b27;border:1px solid var(--border);border-radius:10px;padding:16px;">
+        <div style="font-size:1.3rem;font-weight:700;color:${ok ? 'var(--success)' : 'var(--danger)'};margin-bottom:10px;">
+          ${ok ? '✅ Identity Verified' : '❌ Verification Failed'}
         </div>
-        <div style="font-size:.8rem;color:var(--muted);margin-bottom:4px;">Face Match Confidence</div>
-        <div class="conf-bar"><div class="conf-fill" style="width:${r.faceMatchConfidence||0}%;background:${(r.faceMatchConfidence||0)>70?'var(--success)':'var(--danger)'}"></div></div>
-        <div style="font-size:.78rem;margin-bottom:8px;margin-top:2px;">${r.faceMatchConfidence||0}%</div>
-        ${r.extractedName?`<div style="font-size:.8rem;"><b>Name:</b> ${r.extractedName}</div>`:''}
-        ${r.extractedIdNumber?`<div style="font-size:.8rem;"><b>ID:</b> ${r.extractedIdNumber}</div>`:''}
-        <div class="result-box">${JSON.stringify(r,null,2)}</div>
+        
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px;">
+            <span><b>Face Match Score:</b> ${faceScore}%</span>
+            <span>${r.faceMatchSimilarity ? '(Similarity: '+r.faceMatchSimilarity+')' : ''}</span>
+          </div>
+          <div class="conf-bar">
+            <div class="conf-fill" style="width:${faceScore}%;background:${isGoodMatch ? 'var(--success)' : 'var(--danger)'}"></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.82rem;margin-top:12px;background:#0a0c12;padding:10px;border-radius:6px;">
+          <div><b>Extracted Name:</b> ${r.extractedName || 'N/A'}</div>
+          <div><b>ID Number:</b> ${r.extractedIdNumber || 'N/A'}</div>
+          <div><b>DOB:</b> ${r.extractedDob || 'N/A'}</div>
+          <div><b>Expiry:</b> ${r.extractedExpiry || 'N/A'}</div>
+          <div><b>Sex:</b> ${r.extractedSex || 'N/A'}</div>
+          <div><b>Nationality:</b> ${r.extractedNationality || 'N/A'}</div>
+          <div><b>OCR Confidence:</b> ${r.ocrConfidence}%</div>
+          <div><b>MRZ Detected:</b> ${r.mrzDetected ? 'Yes' : 'No'}</div>
+        </div>
+
+        <div style="margin-top:10px;font-size:.8rem;color:var(--muted);"><b>Server Message:</b> ${r.message}</div>
+        <div class="result-box">${JSON.stringify(r, null, 2)}</div>
       </div>`;
   }catch(e){
-    log('Verify failed: '+e.message,'err',e.data);
-    document.getElementById('btnVerify').disabled=false;
-    document.getElementById('btnVerify').textContent='🚀 Run Verification';
+    log('Verify request failed: '+e.message, 'err');
+  }finally{
+    document.getElementById('btnVerify').disabled = false;
+    document.getElementById('btnVerify').textContent = '🔍 Compare Faces & Extract Data';
   }
 }
 
-// Ping API on load
-fetch(document.getElementById('apiBase').value+'/').then(r=>{
-  document.getElementById('statusDot').style.background = r.ok?'var(--success)':'var(--danger)';
-}).catch(()=>{ document.getElementById('statusDot').style.background='var(--danger)'; });
+// Status check on load
+fetch(base()+'/ekyc/status')
+  .then(r => r.json())
+  .then(() => { document.getElementById('statusDot').style.background = 'var(--success)'; })
+  .catch(() => { document.getElementById('statusDot').style.background = 'var(--danger)'; });
 </script>
 </body>
 </html>
